@@ -6,7 +6,7 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.suryakiran.taskmanagementtool")
 @EnableCaching
 public class TaskmanagementtoolApplication {
 
