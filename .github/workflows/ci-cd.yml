@@ -5,11 +5,12 @@ on:
     branches:
       - master
       - develop
-      - feature/*
+      - 'feature/*'
   pull_request:
     branches:
       - master
       - develop
+      - 'feature/*'
 
 jobs:
   build:
