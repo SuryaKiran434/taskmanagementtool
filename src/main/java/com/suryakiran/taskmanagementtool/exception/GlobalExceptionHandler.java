@@ -1,4 +1,4 @@
-package com.suryakiran.taskmanagementtool.Exception;
+package com.suryakiran.taskmanagementtool.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
