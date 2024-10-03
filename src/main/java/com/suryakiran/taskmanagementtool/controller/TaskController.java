@@ -19,7 +19,7 @@ public class TaskController {
 
     @Autowired
     private TaskService taskService;
-
+// This is the home endpoint
     @GetMapping("/home")
     public String home() {
         logger.info("Accessed home endpoint");
