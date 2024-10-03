@@ -29,13 +29,8 @@ public class TaskController {
     @PostMapping
     public ResponseEntity<Task> createTask(@Valid @RequestBody Task task) {
         logger.info("Creating task with title: {}", task.getTitle());
-        try {
-            Task createdTask = taskService.createTask(task);
-            return ResponseEntity.ok(createdTask);
-        } catch (Exception e) {
-            logger.error("Error creating task: {}", e.getMessage());
-            return ResponseEntity.status(500).body(null);
-        }
+        Task createdTask = taskService.createTask(task);
+        return ResponseEntity.ok(createdTask);
     }
 
     @GetMapping
@@ -55,24 +50,14 @@ public class TaskController {
     @PutMapping("/{id}")
     public ResponseEntity<Task> updateTask(@PathVariable String id, @Valid @RequestBody Task taskDetails) {
         logger.info("Updating task with id: {}", id);
-        try {
-            Task updatedTask = taskService.updateTask(id, taskDetails);
-            return ResponseEntity.ok(updatedTask);
-        } catch (Exception e) {
-            logger.error("Error updating task: {}", e.getMessage());
-            return ResponseEntity.status(500).body(null);
-        }
+        Task updatedTask = taskService.updateTask(id, taskDetails);
+        return ResponseEntity.ok(updatedTask);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable String id) {
         logger.info("Deleting task with id: {}", id);
-        try {
-            taskService.deleteTask(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            logger.error("Error deleting task: {}", e.getMessage());
-            return ResponseEntity.status(500).build();
-        }
+        taskService.deleteTask(id);
+        return ResponseEntity.noContent().build();
     }
 }
