@@ -1,4 +1,4 @@
-package com.suryakiran.taskmanagementtool.Service;
+package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.model.Task;
 
@@ -8,7 +8,7 @@ import java.util.Optional;
 public interface TaskService {
     Task createTask(Task task);
     List<Task> getAllTasks();
-    Optional<Task> getTaskById(Long id);
-    Task updateTask(Long id, Task task);
-    void deleteTask(Long id);
+    Optional<Task> getTaskById(String id);
+    Task updateTask(String id, Task taskDetails);
+    void deleteTask(String id);
 }
