@@ -1,4 +1,4 @@
-package com.suryakiran.taskmanagementtool.Controller;
+package com.suryakiran.taskmanagementtool.controller;
 
 import com.suryakiran.taskmanagementtool.model.Task;
 import com.suryakiran.taskmanagementtool.service.TaskService;
