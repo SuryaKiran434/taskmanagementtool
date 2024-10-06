@@ -22,20 +22,21 @@ public class SecurityConfig {
         if ("desktop".equals(activeProfile)) {
             http
                     .csrf(AbstractHttpConfigurer::disable)
-                    .authorizeHttpRequests((requests) -> requests
+                    .authorizeHttpRequests(requests -> requests
                             .anyRequest().permitAll()
                     );
         } else {
             http
                     .csrf(AbstractHttpConfigurer::disable)
-                    .authorizeHttpRequests((requests) -> requests
-                            .requestMatchers("/", "/home", "/api/tasks/home", "/static/**", "/css/**", "/js/**", "/images/**").permitAll()
+                    .authorizeHttpRequests(requests -> requests
+                            .requestMatchers("/", "/home","/api/tasks/home", "/static/**", "/css/**", "/js/**", "/images/**").permitAll()
                             .anyRequest().authenticated()
                     )
-                    .formLogin(withDefaults()) // Use default login page provided by Spring Security
-                    .httpBasic(withDefaults()); // Use withDefaults() for HTTP Basic Authentication
+                    .formLogin(withDefaults())
+                    .httpBasic(withDefaults());
         }
 
         return http.build();
     }
+
 }
