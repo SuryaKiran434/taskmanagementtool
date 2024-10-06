@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class TaskControllerTest {
+ class TaskControllerTest {
 
     @Mock
     private TaskService taskService;
