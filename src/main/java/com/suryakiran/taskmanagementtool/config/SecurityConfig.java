@@ -1,11 +1,16 @@
 package com.suryakiran.taskmanagementtool.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.suryakiran.taskmanagementtool.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 import static org.springframework.security.config.Customizer.withDefaults;
@@ -14,12 +19,17 @@ import static org.springframework.security.config.Customizer.withDefaults;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${spring.profiles.active}")
-    private String activeProfile;
+    private final CustomUserDetailsService customUserDetailsService;
+    private final Environment environment;
+
+    public SecurityConfig(CustomUserDetailsService customUserDetailsService, Environment environment) {
+        this.customUserDetailsService = customUserDetailsService;
+        this.environment = environment;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        if ("desktop".equals(activeProfile)) {
+        if (isDesktopProfileActive()) {
             http
                     .csrf(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(requests -> requests
@@ -29,7 +39,6 @@ public class SecurityConfig {
             http
                     .csrf(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(requests -> requests
-                            .requestMatchers("/", "/home","/api/tasks/home", "/static/**", "/css/**", "/js/**", "/images/**").permitAll()
                             .anyRequest().authenticated()
                     )
                     .formLogin(withDefaults())
@@ -39,4 +48,24 @@ public class SecurityConfig {
         return http.build();
     }
 
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+        AuthenticationManagerBuilder authBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        authBuilder.userDetailsService(customUserDetailsService).passwordEncoder(passwordEncoder());
+        return authBuilder.build();
+    }
+
+    private boolean isDesktopProfileActive() {
+        for (String profile : environment.getActiveProfiles()) {
+            if (profile.equalsIgnoreCase("desktop")) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
