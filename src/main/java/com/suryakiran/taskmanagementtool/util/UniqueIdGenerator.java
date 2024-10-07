@@ -1,9 +1,7 @@
 package com.suryakiran.taskmanagementtool.util;
 
 import com.suryakiran.taskmanagementtool.repository.TaskRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
 import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.Set;
@@ -15,9 +13,11 @@ public class UniqueIdGenerator {
     private static final int ID_LENGTH = 3;
     private static final SecureRandom RANDOM = new SecureRandom();
     private final Set<String> generatedIds = new HashSet<>();
+    private final TaskRepository taskRepository;
 
-    @Autowired
-    private TaskRepository taskRepository;
+    public UniqueIdGenerator(TaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
+    }
 
     public synchronized String generateUniqueId() {
         String id;
