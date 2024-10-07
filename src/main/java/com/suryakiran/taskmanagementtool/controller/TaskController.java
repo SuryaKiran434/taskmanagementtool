@@ -4,7 +4,6 @@ import com.suryakiran.taskmanagementtool.model.Task;
 import com.suryakiran.taskmanagementtool.service.TaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,9 +16,13 @@ import java.util.Optional;
 public class TaskController {
     private static final Logger logger = LoggerFactory.getLogger(TaskController.class);
 
-    @Autowired
-    private TaskService taskService;
+    private final TaskService taskService;
 
+    public TaskController(TaskService taskService) {
+        this.taskService = taskService;
+    }
+
+    // This is the home endpoint
     @GetMapping("/home")
     public String home() {
         logger.info("Accessed home endpoint");
