@@ -1,8 +1,6 @@
 package com.suryakiran.taskmanagementtool.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -20,8 +18,13 @@ public class Task {
     private String id;
 
     @NotEmpty(message = "Title is required")
+    @Column(name = "title", nullable = false, length = 255)
     private String title;
 
-    @NotEmpty(message = "Description is required")
+    @Column(name = "description", length = 255)
     private String description;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "fk_user"))
+    private User user;
 }
