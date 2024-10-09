@@ -1,9 +1,13 @@
 package com.suryakiran.taskmanagementtool.controller;
 
 import com.suryakiran.taskmanagementtool.model.Task;
+import com.suryakiran.taskmanagementtool.model.Status;
+import com.suryakiran.taskmanagementtool.model.Priority;
 import com.suryakiran.taskmanagementtool.service.TaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,5 +66,13 @@ public class TaskController {
         logger.info("Deleting task with id: {}", id);
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/filter")
+    public Page<Task> getTasks(
+            @RequestParam(required = false) Status status,
+            @RequestParam(required = false) Priority priority,
+            Pageable pageable) {
+        return taskService.getTasks(status, priority, pageable);
     }
 }
