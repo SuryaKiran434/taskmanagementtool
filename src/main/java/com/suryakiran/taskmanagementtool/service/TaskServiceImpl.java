@@ -3,9 +3,14 @@ package com.suryakiran.taskmanagementtool.service;
 import com.suryakiran.taskmanagementtool.exception.ResourceNotFoundException;
 import com.suryakiran.taskmanagementtool.util.UniqueIdGenerator;
 import com.suryakiran.taskmanagementtool.model.Task;
+import com.suryakiran.taskmanagementtool.model.Status;
+import com.suryakiran.taskmanagementtool.model.Priority;
 import com.suryakiran.taskmanagementtool.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +24,7 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final UniqueIdGenerator uniqueIdGenerator;
 
+    @Autowired
     public TaskServiceImpl(TaskRepository taskRepository, UniqueIdGenerator uniqueIdGenerator) {
         this.taskRepository = taskRepository;
         this.uniqueIdGenerator = uniqueIdGenerator;
@@ -66,5 +72,18 @@ public class TaskServiceImpl implements TaskService {
     public void deleteTask(String id) {
         logger.info("Deleting task with id: {}", id);
         taskRepository.deleteById(id);
+    }
+
+    @Override
+    public Page<Task> getTasks(Status status, Priority priority, Pageable pageable) {
+        if (status != null && priority != null) {
+            return taskRepository.findByStatusAndPriority(status, priority, pageable);
+        } else if (status != null) {
+            return taskRepository.findByStatus(status, pageable);
+        } else if (priority != null) {
+            return taskRepository.findByPriority(priority, pageable);
+        } else {
+            return taskRepository.findAll(pageable);
+        }
     }
 }
