@@ -27,4 +27,12 @@ public class Task {
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "fk_user"))
     private User user;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private Status status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", nullable = false)
+    private Priority priority;
 }
