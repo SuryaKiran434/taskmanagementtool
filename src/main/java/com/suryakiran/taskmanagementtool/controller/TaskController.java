@@ -36,6 +36,7 @@ public class TaskController {
     public ResponseEntity<TaskDTO> createTask(@Valid @RequestBody TaskDTO taskDTO) {
         logger.info("Creating task with title: {}", taskDTO.getTitle());
         TaskDTO createdTask = taskService.createTask(taskDTO);
+        logger.info("Task created with ID: {}", createdTask.getId());
         return ResponseEntity.ok(createdTask);
     }
 
@@ -49,21 +50,28 @@ public class TaskController {
     public ResponseEntity<TaskDTO> getTaskById(@PathVariable String id) {
         logger.info("Fetching task by ID: {}", id);
         Optional<TaskDTO> taskDTO = taskService.getTaskById(id);
-        return taskDTO.map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        if (taskDTO.isPresent()) {
+            logger.info("Task found with ID: {}", id);
+            return ResponseEntity.ok(taskDTO.get());
+        } else {
+            logger.warn("Task not found with ID: {}", id);
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<TaskDTO> updateTask(@PathVariable String id, @Valid @RequestBody TaskDTO taskDTO) {
-        logger.info("Updating task with id: {}", id);
+        logger.info("Updating task with ID: {}", id);
         TaskDTO updatedTask = taskService.updateTask(id, taskDTO);
+        logger.info("Task updated with ID: {}", id);
         return ResponseEntity.ok(updatedTask);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable String id) {
-        logger.info("Deleting task with id: {}", id);
+        logger.info("Deleting task with ID: {}", id);
         taskService.deleteTask(id);
+        logger.info("Task deleted with ID: {}", id);
         return ResponseEntity.noContent().build();
     }
 
@@ -72,6 +80,7 @@ public class TaskController {
             @RequestParam(required = false) Status status,
             @RequestParam(required = false) Priority priority,
             Pageable pageable) {
+        logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
         return taskService.getTasks(status, priority, pageable);
     }
 }
