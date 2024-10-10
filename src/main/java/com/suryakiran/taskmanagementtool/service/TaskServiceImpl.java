@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-
+// Service implementation for managing Tasks
 @Service
 public class TaskServiceImpl implements TaskService {
     private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
@@ -30,6 +30,7 @@ public class TaskServiceImpl implements TaskService {
         this.uniqueIdGenerator = uniqueIdGenerator;
     }
 
+    // Create a new task
     @Override
     @Transactional
     public Task createTask(Task task) {
@@ -38,18 +39,21 @@ public class TaskServiceImpl implements TaskService {
         return taskRepository.save(task);
     }
 
+    //Retrieve all tasks
     @Override
     public List<Task> getAllTasks() {
         logger.info("Fetching all tasks");
         return taskRepository.findAll();
     }
 
+    // Retrieves a task by its ID
     @Override
     public Optional<Task> getTaskById(String id) {
         logger.info("Fetching task with id: {}", id);
         return taskRepository.findById(id);
     }
 
+    // Updates an existing task
     @Override
     @Transactional
     public Task updateTask(String id, Task task) {
@@ -67,6 +71,7 @@ public class TaskServiceImpl implements TaskService {
         }
     }
 
+    // Deletes a task by its ID
     @Override
     @Transactional
     public void deleteTask(String id) {
@@ -74,6 +79,7 @@ public class TaskServiceImpl implements TaskService {
         taskRepository.deleteById(id);
     }
 
+    // Retrieves tasks based on status and priority with pagination
     @Override
     public Page<Task> getTasks(Status status, Priority priority, Pageable pageable) {
         if (status != null && priority != null) {
