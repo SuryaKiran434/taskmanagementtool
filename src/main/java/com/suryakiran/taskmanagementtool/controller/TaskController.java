@@ -1,6 +1,6 @@
 package com.suryakiran.taskmanagementtool.controller;
 
-import com.suryakiran.taskmanagementtool.model.Task;
+import com.suryakiran.taskmanagementtool.dto.TaskDTO;
 import com.suryakiran.taskmanagementtool.model.Status;
 import com.suryakiran.taskmanagementtool.model.Priority;
 import com.suryakiran.taskmanagementtool.service.TaskService;
@@ -26,7 +26,6 @@ public class TaskController {
         this.taskService = taskService;
     }
 
-    // This is the home endpoint
     @GetMapping("/home")
     public String home() {
         logger.info("Accessed home endpoint");
@@ -34,30 +33,30 @@ public class TaskController {
     }
 
     @PostMapping
-    public ResponseEntity<Task> createTask(@Valid @RequestBody Task task) {
-        logger.info("Creating task with title: {}", task.getTitle());
-        Task createdTask = taskService.createTask(task);
+    public ResponseEntity<TaskDTO> createTask(@Valid @RequestBody TaskDTO taskDTO) {
+        logger.info("Creating task with title: {}", taskDTO.getTitle());
+        TaskDTO createdTask = taskService.createTask(taskDTO);
         return ResponseEntity.ok(createdTask);
     }
 
     @GetMapping
-    public List<Task> getAllTasks() {
+    public List<TaskDTO> getAllTasks() {
         logger.info("Retrieving all tasks");
         return taskService.getAllTasks();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Task> getTaskById(@PathVariable String id) {
+    public ResponseEntity<TaskDTO> getTaskById(@PathVariable String id) {
         logger.info("Fetching task by ID: {}", id);
-        Optional<Task> task = taskService.getTaskById(id);
-        return task.map(ResponseEntity::ok)
+        Optional<TaskDTO> taskDTO = taskService.getTaskById(id);
+        return taskDTO.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Task> updateTask(@PathVariable String id, @Valid @RequestBody Task taskDetails) {
+    public ResponseEntity<TaskDTO> updateTask(@PathVariable String id, @Valid @RequestBody TaskDTO taskDTO) {
         logger.info("Updating task with id: {}", id);
-        Task updatedTask = taskService.updateTask(id, taskDetails);
+        TaskDTO updatedTask = taskService.updateTask(id, taskDTO);
         return ResponseEntity.ok(updatedTask);
     }
 
@@ -69,7 +68,7 @@ public class TaskController {
     }
 
     @GetMapping("/filter")
-    public Page<Task> getTasks(
+    public Page<TaskDTO> getTasks(
             @RequestParam(required = false) Status status,
             @RequestParam(required = false) Priority priority,
             Pageable pageable) {
