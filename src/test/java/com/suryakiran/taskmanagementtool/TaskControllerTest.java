@@ -1,7 +1,7 @@
 package com.suryakiran.taskmanagementtool;
 
 import com.suryakiran.taskmanagementtool.controller.TaskController;
-import com.suryakiran.taskmanagementtool.model.Task;
+import com.suryakiran.taskmanagementtool.dto.TaskDTO;
 import com.suryakiran.taskmanagementtool.service.TaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
- class TaskControllerTest {
+class TaskControllerTest {
 
     @Mock
     private TaskService taskService;
@@ -28,16 +28,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
     @Test
     void testCreateTask() {
-        Task task = new Task();
-        task.setTitle("New Task");
+        TaskDTO taskDTO = new TaskDTO();
+        taskDTO.setTitle("New Task");
 
-        when(taskService.createTask(any(Task.class))).thenReturn(task);
+        when(taskService.createTask(any(TaskDTO.class))).thenReturn(taskDTO);
 
-        ResponseEntity<Task> response = taskController.createTask(task);
+        ResponseEntity<TaskDTO> response = taskController.createTask(taskDTO);
 
         assertNotNull(response.getBody());
         assertEquals("New Task", response.getBody().getTitle());
 
-        verify(taskService, times(1)).createTask(any(Task.class));
+        verify(taskService, times(1)).createTask(any(TaskDTO.class));
     }
 }
