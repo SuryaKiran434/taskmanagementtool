@@ -1,5 +1,6 @@
 package com.suryakiran.taskmanagementtool.controller;
 
+import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.service.UserService;
 import org.slf4j.Logger;
@@ -23,7 +24,7 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public List<User> getAllUsers() {
+    public List<UserDTO> getAllUsers() {
         logger.info("Fetching all users");
         return userService.getAllUsers();
     }

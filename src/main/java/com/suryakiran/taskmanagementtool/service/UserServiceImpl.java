@@ -1,5 +1,6 @@
 package com.suryakiran.taskmanagementtool.service;
 
+import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.model.Role;
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.repository.RoleRepository;
@@ -9,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -30,9 +34,21 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> getAllUsers() {
+    @Transactional(readOnly = true)
+    public List<UserDTO> getAllUsers() {
         logger.info("Fetching all users");
-        return userRepository.findAll();
+        List<User> users = userRepository.findAll();
+        return Collections.unmodifiableList(users.stream().map(this::convertToDTO).toList());
+    }
+
+    private UserDTO convertToDTO(User user) {
+        UserDTO userDTO = new UserDTO();
+        userDTO.setId(user.getId());
+        userDTO.setFirstName(user.getFirstName());
+        userDTO.setLastName(user.getLastName());
+        userDTO.setEmail(user.getEmail());
+        userDTO.setRoles(user.getRoles().stream().map(Role::getName).toList());
+        return userDTO;
     }
 
     @Override

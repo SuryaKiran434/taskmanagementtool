@@ -1,5 +1,6 @@
 package com.suryakiran.taskmanagementtool.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
@@ -24,6 +25,7 @@ public class Task {
     @Column(name = "description", length = 255)
     private String description;
 
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "fk_user"))
     private User user;
