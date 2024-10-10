@@ -2,10 +2,11 @@ package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.dto.TaskDTO;
 import com.suryakiran.taskmanagementtool.exception.TaskNotFoundException;
-import com.suryakiran.taskmanagementtool.model.Task;
-import com.suryakiran.taskmanagementtool.model.Status;
 import com.suryakiran.taskmanagementtool.model.Priority;
+import com.suryakiran.taskmanagementtool.model.Status;
+import com.suryakiran.taskmanagementtool.model.Task;
 import com.suryakiran.taskmanagementtool.repository.TaskRepository;
+import com.suryakiran.taskmanagementtool.util.UniqueIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,21 +15,23 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
+    private final UniqueIdGenerator uniqueIdGenerator;
 
     @Autowired
-    public TaskServiceImpl(TaskRepository taskRepository) {
+    public TaskServiceImpl(TaskRepository taskRepository, UniqueIdGenerator uniqueIdGenerator) {
         this.taskRepository = taskRepository;
+        this.uniqueIdGenerator = uniqueIdGenerator;
     }
 
     @Override
     public TaskDTO createTask(TaskDTO taskDTO) {
         Task task = convertToEntity(taskDTO);
+        task.setId(uniqueIdGenerator.generateUniqueId());
         Task savedTask = taskRepository.save(task);
         return convertToDTO(savedTask);
     }
