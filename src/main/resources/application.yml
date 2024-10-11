@@ -3,6 +3,8 @@ spring:
     active: desktop
 server:
     port: 8080
+jwt:
+    secret: ${JWT_SECRET}
 ---
 spring:
   config:
@@ -10,6 +12,8 @@ spring:
       on-profile: dev
 server:
     port: 8081
+jwt:
+  secret: ${JWT_SECRET}
 ---
 spring:
   config:
@@ -17,3 +21,5 @@ spring:
       on-profile: prod
 server:
     port: 8082
+jwt:
+  secret: ${JWT_SECRET}
