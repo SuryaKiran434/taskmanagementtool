@@ -17,11 +17,8 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
+    @Value("#{environment.JWT_SECRET}")
     private String secret;
-
-    @Value("${jwt.expiration}")
-    private long expiration;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
@@ -64,6 +61,7 @@ public class JwtUtil {
 
     // Create the JWT token
     private String createToken(Map<String, Object> claims, String subject) {
+        final long expiration = 3600000; // 1 hour in milliseconds
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
