@@ -1,5 +1,6 @@
 package com.suryakiran.taskmanagementtool.config;
 
+import com.suryakiran.taskmanagementtool.filter.JwtRequestFilter;
 import com.suryakiran.taskmanagementtool.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,21 +10,23 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-
-import static org.springframework.security.config.Customizer.withDefaults;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
+    private final JwtRequestFilter jwtRequestFilter;
     private final Environment environment;
 
-    public SecurityConfig(CustomUserDetailsService customUserDetailsService, Environment environment) {
+    public SecurityConfig(CustomUserDetailsService customUserDetailsService, JwtRequestFilter jwtRequestFilter, Environment environment) {
         this.customUserDetailsService = customUserDetailsService;
+        this.jwtRequestFilter = jwtRequestFilter;
         this.environment = environment;
     }
 
@@ -39,12 +42,13 @@ public class SecurityConfig {
             http
                     .csrf(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(requests -> requests
-                            .requestMatchers("/admin/**").hasRole("ADMIN")
-                            .requestMatchers("/user/**").hasRole("USER")
+                            .requestMatchers("/api/authenticate").permitAll()
                             .anyRequest().authenticated()
                     )
-                    .formLogin(withDefaults())
-                    .httpBasic(withDefaults());
+                    .sessionManagement(session -> session
+                            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                    );
+            http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         }
 
         return http.build();
