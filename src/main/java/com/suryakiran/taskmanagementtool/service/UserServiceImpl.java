@@ -1,22 +1,25 @@
 package com.suryakiran.taskmanagementtool.service;
 
+import com.suryakiran.taskmanagementtool.dto.LoginRequest;
 import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.model.Role;
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.repository.RoleRepository;
 import com.suryakiran.taskmanagementtool.repository.UserRepository;
+import com.suryakiran.taskmanagementtool.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
-import java.util.Optional;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -25,12 +28,14 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @Override
@@ -58,7 +63,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User createUser(User user) {
+    public User registerUser(User user) {
         logger.info("Creating user");
         validatePassword(user.getPassword());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -113,6 +118,24 @@ public class UserServiceImpl implements UserService {
         Role role = roleRepository.findByName(roleName).orElseThrow(() -> new RuntimeException("Role not found"));
         user.getRoles().add(role);
         return userRepository.save(user);
+    }
+
+    @Override
+    public ResponseEntity<?> login(LoginRequest loginRequest) {
+        Optional<User> optionalUser = userRepository.findByEmail(loginRequest.getEmail());
+        if (optionalUser.isEmpty()) {
+            return ResponseEntity.status(401).body("Invalid email or password");
+        }
+        User user = optionalUser.get();
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(401).body("Invalid email or password");
+        }
+        Collection<? extends GrantedAuthority> authorities = user.getRoles().stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .toList();
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(user.getEmail(), user.getPassword(), authorities);
+        String token = jwtUtil.generateToken(userDetails);
+        return ResponseEntity.ok(token);
     }
 
     private void validatePassword(String password) {

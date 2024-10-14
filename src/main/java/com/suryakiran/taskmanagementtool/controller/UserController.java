@@ -1,10 +1,15 @@
+
 package com.suryakiran.taskmanagementtool.controller;
 
+import com.suryakiran.taskmanagementtool.dto.LoginRequest;
 import com.suryakiran.taskmanagementtool.dto.UserDTO;
+import com.suryakiran.taskmanagementtool.dto.UserRegistrationDTO;
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.service.UserService;
+import com.suryakiran.taskmanagementtool.util.PasswordValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +45,26 @@ public class UserController {
     @PostMapping
     public User createUser(@RequestBody User user) {
         logger.info("Creating user with email: {}", user.getEmail());
-        return userService.createUser(user);
+        return userService.registerUser(user);
+    }
+
+    @PostMapping("/register")
+    public User registerUser(@RequestBody UserRegistrationDTO userRegistrationDTO) {
+        logger.info("Registering user with email: {}", userRegistrationDTO.getEmail());
+        if (!PasswordValidator.validatePassword(userRegistrationDTO.getPassword())) {
+            throw new IllegalArgumentException("Password does not meet complexity requirements");
+        }
+        User user = new User();
+        user.setFirstName(userRegistrationDTO.getFirstName());
+        user.setLastName(userRegistrationDTO.getLastName());
+        user.setEmail(userRegistrationDTO.getEmail());
+        user.setPassword(userRegistrationDTO.getPassword());
+        return userService.registerUser(user);
+    }
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        logger.info("Attempting to log in user with email: {}", loginRequest.getEmail());
+        return userService.login(loginRequest);
     }
 
     @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")

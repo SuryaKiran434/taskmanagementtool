@@ -4,9 +4,11 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import com.suryakiran.taskmanagementtool.service.TokenBlacklistService;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
@@ -20,16 +22,17 @@ public class JwtUtil {
     @Value("#{environment.JWT_SECRET}")
     private String secret;
 
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    // Extract username from the JWT token
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
 
-    // Extract expiration date from the JWT token
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
@@ -39,7 +42,6 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    // Parse and extract all claims from the JWT token
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
@@ -48,18 +50,15 @@ public class JwtUtil {
                 .getBody();
     }
 
-    // Check if the token has expired
     private Boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
-    // Generate a new token for the user
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, userDetails.getUsername());
     }
 
-    // Create the JWT token
     private String createToken(Map<String, Object> claims, String subject) {
         final long expiration = 3600000; // 1 hour in milliseconds
         return Jwts.builder()
@@ -71,9 +70,21 @@ public class JwtUtil {
                 .compact();
     }
 
-    // Validate the token by checking username and expiration
     public Boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token) && !tokenBlacklistService.isBlacklisted(token));
+    }
+
+    public String refreshToken(String token) {
+        if (tokenBlacklistService.isBlacklisted(token)) {
+            throw new IllegalArgumentException("Token is blacklisted");
+        }
+        final Claims claims = extractAllClaims(token);
+        claims.setIssuedAt(new Date(System.currentTimeMillis()));
+        claims.setExpiration(new Date(System.currentTimeMillis() + 3600000)); // 1 hour in milliseconds
+        return Jwts.builder()
+                .setClaims(claims)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
     }
 }
