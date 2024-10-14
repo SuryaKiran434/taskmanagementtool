@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,13 +32,14 @@ class TaskControllerTest {
         TaskDTO taskDTO = new TaskDTO();
         taskDTO.setTitle("New Task");
 
-        when(taskService.createTask(any(TaskDTO.class))).thenReturn(taskDTO);
+        Authentication authentication = mock(Authentication.class);
+        when(taskService.createTask(any(TaskDTO.class), eq(authentication))).thenReturn(taskDTO);
 
-        ResponseEntity<TaskDTO> response = taskController.createTask(taskDTO);
+        ResponseEntity<TaskDTO> response = taskController.createTask(taskDTO, authentication);
 
         assertNotNull(response.getBody());
         assertEquals("New Task", response.getBody().getTitle());
 
-        verify(taskService, times(1)).createTask(any(TaskDTO.class));
+        verify(taskService, times(1)).createTask(any(TaskDTO.class), eq(authentication));
     }
 }
