@@ -1,8 +1,10 @@
 package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.dto.TaskDTO;
+import com.suryakiran.taskmanagementtool.exception.AuthenticationRequiredException;
 import com.suryakiran.taskmanagementtool.exception.NoTasksFoundException;
 import com.suryakiran.taskmanagementtool.exception.TaskNotFoundException;
+import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
 import com.suryakiran.taskmanagementtool.model.Priority;
 import com.suryakiran.taskmanagementtool.model.Status;
 import com.suryakiran.taskmanagementtool.model.Task;
@@ -24,6 +26,8 @@ import java.util.Optional;
 public class TaskServiceImpl implements TaskService {
 
     private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
+    private static final String USER_NOT_FOUND = "User not found";
+    private static final String AUTHENTICATION_REQUIRED = "Authentication required";
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
@@ -39,8 +43,11 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public TaskDTO createTask(TaskDTO taskDTO, Authentication authentication) {
         logger.info("Creating task with title: {}", taskDTO.getTitle());
+        if (!authentication.isAuthenticated()) {
+            throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
+        }
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Task task = convertToEntity(taskDTO);
         task.setId(uniqueIdGenerator.generateUniqueId());
         task.setUser(user);
@@ -50,10 +57,23 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public Page<TaskDTO> getAllTasks(Pageable pageable) {
+        logger.info("Retrieving all tasks without authentication");
+        Page<Task> tasks = taskRepository.findAll(pageable);
+        if (tasks.isEmpty()) {
+            throw new NoTasksFoundException("No tasks found");
+        }
+        return tasks.map(this::convertToDTO);
+    }
+
+    @Override
     public Page<TaskDTO> getAllTasks(Pageable pageable, Authentication authentication) {
         logger.info("Retrieving all tasks for user: {}", authentication.getName());
+        if (!authentication.isAuthenticated()) {
+            return getAllTasks(pageable);
+        }
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Page<Task> tasks = taskRepository.findByUser(user, pageable);
         if (tasks.isEmpty()) {
             throw new NoTasksFoundException("No tasks found for user: " + user.getFirstName() + " " + user.getLastName());
@@ -62,10 +82,20 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public Optional<TaskDTO> getTaskById(String id) {
+        logger.info("Fetching task by ID: {}", id);
+        Optional<Task> task = taskRepository.findById(id);
+        return task.map(this::convertToDTO);
+    }
+
+    @Override
     public Optional<TaskDTO> getTaskById(String id, Authentication authentication) {
         logger.info("Fetching task by ID: {}", id);
+        if (!authentication.isAuthenticated()) {
+            return getTaskById(id);
+        }
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Optional<Task> task = taskRepository.findByIdAndUser(id, user);
         return task.map(this::convertToDTO);
     }
@@ -73,8 +103,11 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public TaskDTO updateTask(String id, TaskDTO taskDTO, Authentication authentication) {
         logger.info("Updating task with ID: {}", id);
+        if (!authentication.isAuthenticated()) {
+            throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
+        }
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Task task = taskRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         task.setTitle(taskDTO.getTitle());
@@ -89,8 +122,11 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public void deleteTask(String id, Authentication authentication) {
         logger.info("Deleting task with ID: {}", id);
+        if (!authentication.isAuthenticated()) {
+            throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
+        }
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Task task = taskRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         taskRepository.delete(task);
@@ -98,10 +134,20 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public Page<TaskDTO> getTasks(Status status, Priority priority, Pageable pageable) {
+        logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
+        Page<Task> tasks = taskRepository.findByStatusOrPriority(status, priority, pageable);
+        return tasks.map(this::convertToDTO);
+    }
+
+    @Override
     public Page<TaskDTO> getTasks(Status status, Priority priority, Pageable pageable, Authentication authentication) {
         logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
+        if (!authentication.isAuthenticated()) {
+            return getTasks(status, priority, pageable);
+        }
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Page<Task> tasks = taskRepository.findByUserAndStatusAndPriority(user, status, priority, pageable);
         return tasks.map(this::convertToDTO);
     }
