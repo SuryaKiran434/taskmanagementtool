@@ -37,6 +37,9 @@ public class TaskController {
     @PostMapping
     public ResponseEntity<TaskDTO> createTask(@Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
         logger.info("Creating task with title: {}", taskDTO.getTitle());
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
         TaskDTO createdTask = taskService.createTask(taskDTO, authentication);
         logger.info("Task created with ID: {}", createdTask.getId());
         return ResponseEntity.ok(createdTask);
@@ -45,7 +48,12 @@ public class TaskController {
     @GetMapping
     public ResponseEntity<List<TaskDTO>> getAllTasks(Pageable pageable, Authentication authentication) {
         logger.info("Retrieving all tasks");
-        Page<TaskDTO> taskPage = taskService.getAllTasks(pageable, authentication);
+        Page<TaskDTO> taskPage;
+        if (authentication == null || !authentication.isAuthenticated()) {
+            taskPage = taskService.getAllTasks(pageable);
+        } else {
+            taskPage = taskService.getAllTasks(pageable, authentication);
+        }
         List<TaskDTO> tasks = taskPage.getContent();
         return ResponseEntity.ok(tasks);
     }
@@ -53,29 +61,37 @@ public class TaskController {
     @GetMapping("/{id}")
     public ResponseEntity<TaskDTO> getTaskById(@PathVariable String id, Authentication authentication) {
         logger.info("Fetching task by ID: {}", id);
-        Optional<TaskDTO> taskDTO = taskService.getTaskById(id, authentication);
-        if (taskDTO.isPresent()) {
-            logger.info("Task found with ID: {}", id);
-            return ResponseEntity.ok(taskDTO.get());
+        Optional<TaskDTO> taskDTO;
+        if (authentication == null || !authentication.isAuthenticated()) {
+            taskDTO = taskService.getTaskById(id);
         } else {
-            logger.warn("Task not found with ID: {}", id);
-            return ResponseEntity.notFound().build();
+            taskDTO = taskService.getTaskById(id, authentication);
         }
+        return taskDTO.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasRole('ADMIN') or @taskService.isTaskOwner(#id, authentication.principal.id)")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or @taskService.isTaskOwner(#id, authentication?.principal?.id)")
     @PutMapping("/{id}")
     public ResponseEntity<TaskDTO> updateTask(@PathVariable String id, @Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
         logger.info("Updating task with ID: {}", id);
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
         TaskDTO updatedTask = taskService.updateTask(id, taskDTO, authentication);
+        if(updatedTask == null) {
+            return ResponseEntity.status(404).build();
+        }
         logger.info("Task updated with ID: {}", id);
         return ResponseEntity.ok(updatedTask);
     }
 
-    @PreAuthorize("hasRole('ADMIN') or @taskService.isTaskOwner(#id, authentication.principal.id)")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or @taskService.isTaskOwner(#id, authentication?.principal?.id)")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable String id, Authentication authentication) {
         logger.info("Deleting task with ID: {}", id);
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
         taskService.deleteTask(id, authentication);
         logger.info("Task deleted with ID: {}", id);
         return ResponseEntity.noContent().build();
@@ -87,7 +103,12 @@ public class TaskController {
             @RequestParam(required = false) Priority priority,
             Pageable pageable, Authentication authentication) {
         logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
-        Page<TaskDTO> taskPage = taskService.getTasks(status, priority, pageable, authentication);
+        Page<TaskDTO> taskPage;
+        if (authentication == null || !authentication.isAuthenticated()) {
+            taskPage = taskService.getTasks(status, priority, pageable);
+        } else {
+            taskPage = taskService.getTasks(status, priority, pageable, authentication);
+        }
         List<TaskDTO> tasks = taskPage.getContent();
         return ResponseEntity.ok(tasks);
     }
