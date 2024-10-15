@@ -27,14 +27,14 @@ public class UserController {
         this.userService = userService;
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @GetMapping
     public List<UserDTO> getAllUsers() {
         logger.info("Fetching all users");
         return userService.getAllUsers();
     }
 
-    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or #id == authentication.principal.id")
     @GetMapping("/{id}")
     public User getUserById(@PathVariable int id, Authentication authentication) {
         logger.info("Fetching user with id: {}", id);
