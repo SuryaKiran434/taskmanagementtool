@@ -35,22 +35,20 @@ public class SecurityConfig {
         if (isDesktopProfileActive()) {
             http
                     .csrf(AbstractHttpConfigurer::disable)
-                    .authorizeHttpRequests(requests -> requests
-                            .anyRequest().permitAll()
-                    );
+                    .authorizeHttpRequests(requests -> requests.anyRequest().permitAll());
         } else {
             http
                     .csrf(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(requests -> requests
                             .requestMatchers("/api/authenticate", "/api/users/login", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                            .anyRequest().authenticated()
-                    )
-                    .sessionManagement(session -> session
-                            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                    );
-            http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+                            .requestMatchers("/api/tasks/**").authenticated()
+                            .anyRequest().authenticated())
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    // Disable anonymous authentication
+                    .anonymous(AbstractHttpConfigurer::disable)
+                    // Add JWT request filter before UsernamePasswordAuthenticationFilter
+                    .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         }
-
         return http.build();
     }
 
