@@ -1,35 +1,54 @@
 package com.suryakiran.taskmanagementtool.config;
 
+import com.suryakiran.taskmanagementtool.filter.JwtRequestFilter;
+import com.suryakiran.taskmanagementtool.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final CustomUserDetailsService customUserDetailsService;
+    private final JwtRequestFilter jwtRequestFilter;
+    private final Environment environment;
+
+    public SecurityConfig(CustomUserDetailsService customUserDetailsService, JwtRequestFilter jwtRequestFilter, Environment environment) {
+        this.customUserDetailsService = customUserDetailsService;
+        this.jwtRequestFilter = jwtRequestFilter;
+        this.environment = environment;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .authorizeHttpRequests((requests) -> requests
-                        .requestMatchers("/", "/home").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .formLogin((form) -> form
-                        .loginPage("/login")
-                        .permitAll()
-                )
-                .logout(LogoutConfigurer::permitAll);
-
+        if (isDesktopProfileActive()) {
+            http
+                    .csrf(AbstractHttpConfigurer::disable)
+                    .authorizeHttpRequests(requests -> requests.anyRequest().permitAll());
+        } else {
+            http
+                    .csrf(AbstractHttpConfigurer::disable)
+                    .authorizeHttpRequests(requests -> requests
+                            .requestMatchers("/api/authenticate", "/api/users/login", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                            .requestMatchers("/api/tasks/**").authenticated()
+                            .anyRequest().authenticated())
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    // Disable anonymous authentication
+                    .anonymous(AbstractHttpConfigurer::disable)
+                    // Add JWT request filter before UsernamePasswordAuthenticationFilter
+                    .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+        }
         return http.build();
     }
 
@@ -39,12 +58,18 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails user = User.withUsername("user")
-                .password(passwordEncoder.encode("password"))
-                .roles("USER")
-                .build();
+    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+        AuthenticationManagerBuilder authBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        authBuilder.userDetailsService(customUserDetailsService).passwordEncoder(passwordEncoder());
+        return authBuilder.build();
+    }
 
-        return new InMemoryUserDetailsManager(user);
+    private boolean isDesktopProfileActive() {
+        for (String profile : environment.getActiveProfiles()) {
+            if (profile.equalsIgnoreCase("desktop")) {
+                return true;
+            }
+        }
+        return false;
     }
 }
