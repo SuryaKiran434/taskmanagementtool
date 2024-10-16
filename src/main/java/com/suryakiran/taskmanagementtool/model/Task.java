@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.sql.Date;
+
 @Getter
 @Setter
 @Entity
@@ -37,4 +39,8 @@ public class Task {
     @Enumerated(EnumType.STRING)
     @Column(name = "priority", nullable = false)
     private Priority priority;
+
+    @Temporal(TemporalType.DATE)
+    @Column(name = "due_date", nullable = false)
+    private Date dueDate;
 }
