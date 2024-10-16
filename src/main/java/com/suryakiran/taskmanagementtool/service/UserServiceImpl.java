@@ -53,6 +53,7 @@ public class UserServiceImpl implements UserService {
         userDTO.setLastName(user.getLastName());
         userDTO.setEmail(user.getEmail());
         userDTO.setRoles(user.getRoles().stream().map(Role::getName).toList());
+        userDTO.setCreatedAt(user.getCreatedAt());
         return userDTO;
     }
 
