@@ -1,57 +1,46 @@
 package com.suryakiran.taskmanagementtool.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotEmpty;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+import java.sql.Date;
+
+@Getter
+@Setter
 @Entity
+@Table(name = "task")
+@NoArgsConstructor
+@AllArgsConstructor
 public class Task {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @NotBlank
-    @Size(max = 100)
-    private String name;
+    @NotEmpty(message = "Title is required")
+    @Column(name = "title", nullable = false, length = 255)
+    private String title;
 
-    @Size(max = 500)
+    @Column(name = "description", length = 255)
     private String description;
 
-    // Constructors
-    public Task() {
-    }
+    @JsonIgnore
+    @ManyToOne
+    @JoinColumn(name = "user_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "fk_user"))
+    private User user;
 
-    public Task(String name, String description) {
-        this.name = name;
-        this.description = description;
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private Status status;
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", nullable = false)
+    private Priority priority;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    @Temporal(TemporalType.DATE)
+    @Column(name = "due_date", nullable = false)
+    private Date dueDate;
 }
