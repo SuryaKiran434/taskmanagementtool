@@ -1,4 +1,4 @@
-package com.suryakiran.taskmanagementtool.Exception;
+package com.suryakiran.taskmanagementtool.exception;
 
 public class ResourceNotFoundException extends RuntimeException {
     public ResourceNotFoundException(String message) {
