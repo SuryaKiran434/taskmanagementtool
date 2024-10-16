@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,10 +54,12 @@ class TaskServiceImplTest {
         task.setId("1");
         task.setTitle("Test Task");
         task.setUser(user);
+        task.setDueDate(java.sql.Date.valueOf(LocalDate.now().plusDays(1))); // Set dueDate
 
         taskDTO = new TaskDTO();
         taskDTO.setId("1");
         taskDTO.setTitle("Test Task");
+        taskDTO.setDueDate(java.sql.Date.valueOf(LocalDate.now().plusDays(1))); // Set dueDate
     }
 
     @Test
@@ -71,6 +74,7 @@ class TaskServiceImplTest {
 
         assertNotNull(createdTask);
         assertEquals("1", createdTask.getId());
+        assertEquals(taskDTO.getDueDate(), createdTask.getDueDate()); // Verify dueDate
         verify(taskRepository, times(1)).save(any(Task.class));
     }
 
@@ -80,7 +84,6 @@ class TaskServiceImplTest {
 
         assertThrows(AuthenticationRequiredException.class, () -> taskService.createTask(taskDTO, authentication));
         verify(taskRepository, never()).save(any());
-        // Removed unnecessary stubbing
     }
 
     @Test
@@ -101,7 +104,6 @@ class TaskServiceImplTest {
 
         assertThrows(AuthenticationRequiredException.class, () -> taskService.deleteTask("1", authentication));
         verify(taskRepository, never()).delete(any());
-        // Removed unnecessary stubbing
     }
 
     @Test
@@ -116,6 +118,7 @@ class TaskServiceImplTest {
 
         assertNotNull(updatedTask);
         assertEquals("1", updatedTask.getId());
+        assertEquals(taskDTO.getDueDate(), updatedTask.getDueDate()); // Verify dueDate
         verify(taskRepository, times(1)).save(any(Task.class));
     }
 
@@ -125,6 +128,5 @@ class TaskServiceImplTest {
 
         assertThrows(AuthenticationRequiredException.class, () -> taskService.updateTask("1", taskDTO, authentication));
         verify(taskRepository, never()).save(any());
-        // Removed unnecessary stubbing
     }
 }
