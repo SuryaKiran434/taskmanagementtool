@@ -43,7 +43,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             jwt = authorizationHeader.substring(7);
-
             try {
                 username = jwtUtil.extractUsername(jwt);
                 logger.info("Username extracted from token: {}", username);
@@ -56,24 +55,26 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().getAuthentication().getPrincipal().equals("anonymousUser"))) {
 
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-
             boolean isTokenValid = jwtUtil.validateToken(jwt, userDetails);
             logger.info("Token validation result: {}", isTokenValid);
 
             if (isTokenValid) {
                 List<String> roles = jwtUtil.extractRoles(jwt);
-                logger.info("Roles extracted from token: {}", roles);
+                if (roles != null) {
+                    logger.info("Roles extracted from token: {}", roles);
+                    List<SimpleGrantedAuthority> authorities = roles.stream()
+                            .map(SimpleGrantedAuthority::new)
+                            .toList();
 
-                List<SimpleGrantedAuthority> authorities = roles.stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .toList();
-
-                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, authorities);
-                usernamePasswordAuthenticationToken
-                        .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-                logger.info("Authentication set for user: {}", username);
+                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, authorities);
+                    usernamePasswordAuthenticationToken
+                            .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+                    logger.info("Authentication set for user: {}", username);
+                } else {
+                    logger.warn("No roles found in token for user: {}", username);
+                }
             } else {
                 logger.warn("Token validation failed for token: {}", jwt);
             }
