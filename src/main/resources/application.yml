@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: desktop
+    active: dev
 server:
     port: 8080
 jwt:

@@ -9,6 +9,7 @@ import com.suryakiran.taskmanagementtool.service.UserService;
 import com.suryakiran.taskmanagementtool.util.PasswordValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -29,9 +30,12 @@ public class UserController {
 
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @GetMapping
-    public List<UserDTO> getAllUsers() {
+    public ResponseEntity<List<UserDTO>> getAllUsers() {
         logger.info("Fetching all users");
-        return userService.getAllUsers();
+        List<UserDTO> users = userService.getAllUsers(); // Fetch users
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(users); // Return users in the response
     }
 
     @PreAuthorize("hasRole('ROLE_ADMIN') or #id == authentication.principal.id")
