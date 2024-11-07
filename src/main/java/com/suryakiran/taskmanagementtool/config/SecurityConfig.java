@@ -15,6 +15,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
@@ -39,17 +44,27 @@ public class SecurityConfig {
         } else {
             http
                     .csrf(AbstractHttpConfigurer::disable)
+                    .cors(withDefaults())
                     .authorizeHttpRequests(requests -> requests
-                            .requestMatchers("/api/authenticate", "/api/users/login", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                            .requestMatchers("/api/authenticate", "/api/refresh-token", "/api/logout", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll() // Added refresh-token and logout
                             .requestMatchers("/api/tasks/**").authenticated()
                             .anyRequest().authenticated())
                     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                    // Disable anonymous authentication
                     .anonymous(AbstractHttpConfigurer::disable)
-                    // Add JWT request filter before UsernamePasswordAuthenticationFilter
                     .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         }
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.addAllowedOrigin("http://localhost:3000"); // Allow your frontend origin
+        configuration.addAllowedMethod("*");
+        configuration.addAllowedHeader("*");
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean

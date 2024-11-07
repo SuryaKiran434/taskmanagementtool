@@ -1,3 +1,4 @@
+// File: src/main/java/com/suryakiran/taskmanagementtool/controller/TaskController.java
 package com.suryakiran.taskmanagementtool.controller;
 
 import com.suryakiran.taskmanagementtool.dto.TaskDTO;
@@ -35,25 +36,25 @@ public class TaskController {
     }
 
     @PostMapping
-    public ResponseEntity<TaskDTO> createTask(@Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
+    public ResponseEntity<?> createTask(@Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
         logger.info("Creating task with title: {}", taskDTO.getTitle());
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).build();
         }
-        TaskDTO createdTask = taskService.createTask(taskDTO, authentication);
-        logger.info("Task created with ID: {}", createdTask.getId());
-        return ResponseEntity.ok(createdTask);
+        try {
+            TaskDTO createdTask = taskService.createTask(taskDTO, authentication);
+            logger.info("Task created with ID: {}", createdTask.getId());
+            return ResponseEntity.ok(createdTask);
+        } catch (Exception e) {
+            logger.error("Error creating task", e);
+            return ResponseEntity.status(500).body("Failed to create task. Please try again later.");
+        }
     }
 
     @GetMapping
     public ResponseEntity<List<TaskDTO>> getAllTasks(Pageable pageable, Authentication authentication) {
         logger.info("Retrieving all tasks");
-        Page<TaskDTO> taskPage;
-        if (authentication == null || !authentication.isAuthenticated()) {
-            taskPage = taskService.getAllTasks(pageable);
-        } else {
-            taskPage = taskService.getAllTasks(pageable, authentication);
-        }
+        Page<TaskDTO> taskPage = taskService.getAllTasks(pageable, authentication);
         List<TaskDTO> tasks = taskPage.getContent();
         return ResponseEntity.ok(tasks);
     }
@@ -61,12 +62,7 @@ public class TaskController {
     @GetMapping("/{id}")
     public ResponseEntity<TaskDTO> getTaskById(@PathVariable String id, Authentication authentication) {
         logger.info("Fetching task by ID: {}", id);
-        Optional<TaskDTO> taskDTO;
-        if (authentication == null || !authentication.isAuthenticated()) {
-            taskDTO = taskService.getTaskById(id);
-        } else {
-            taskDTO = taskService.getTaskById(id, authentication);
-        }
+        Optional<TaskDTO> taskDTO = taskService.getTaskById(id, authentication);
         return taskDTO.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -103,12 +99,7 @@ public class TaskController {
             @RequestParam(required = false) Priority priority,
             Pageable pageable, Authentication authentication) {
         logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
-        Page<TaskDTO> taskPage;
-        if (authentication == null || !authentication.isAuthenticated()) {
-            taskPage = taskService.getTasks(status, priority, pageable);
-        } else {
-            taskPage = taskService.getTasks(status, priority, pageable, authentication);
-        }
+        Page<TaskDTO> taskPage = taskService.getTasks(status, priority, pageable, authentication);
         List<TaskDTO> tasks = taskPage.getContent();
         return ResponseEntity.ok(tasks);
     }
