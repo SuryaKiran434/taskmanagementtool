@@ -1,8 +1,8 @@
 package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.dto.TaskDTO;
+import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.exception.AuthenticationRequiredException;
-import com.suryakiran.taskmanagementtool.exception.NoTasksFoundException;
 import com.suryakiran.taskmanagementtool.exception.TaskNotFoundException;
 import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
 import com.suryakiran.taskmanagementtool.model.Priority;
@@ -60,9 +60,6 @@ public class TaskServiceImpl implements TaskService {
     public Page<TaskDTO> getAllTasks(Pageable pageable) {
         logger.info("Retrieving all tasks without authentication");
         Page<Task> tasks = taskRepository.findAll(pageable);
-        if (tasks.isEmpty()) {
-            throw new NoTasksFoundException("No tasks found");
-        }
         return tasks.map(this::convertToDTO);
     }
 
@@ -75,9 +72,6 @@ public class TaskServiceImpl implements TaskService {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Page<Task> tasks = taskRepository.findByUser(user, pageable);
-        if (tasks.isEmpty()) {
-            throw new NoTasksFoundException("No tasks found for user: " + user.getFirstName() + " " + user.getLastName());
-        }
         return tasks.map(this::convertToDTO);
     }
 
@@ -166,6 +160,20 @@ public class TaskServiceImpl implements TaskService {
         taskDTO.setStatus(task.getStatus());
         taskDTO.setPriority(task.getPriority());
         taskDTO.setDueDate(task.getDueDate()); // Set dueDate
+
+        User creator = task.getUser();
+        if (creator != null) {
+            taskDTO.setCreatorFirstName(creator.getFirstName());
+            taskDTO.setCreatorLastName(creator.getLastName());
+            UserDTO creatorDTO = new UserDTO();
+            creatorDTO.setId(creator.getId());
+            creatorDTO.setFirstName(creator.getFirstName());
+            creatorDTO.setLastName(creator.getLastName());
+            creatorDTO.setEmail(creator.getEmail());
+            creatorDTO.setCreatedAt(creator.getCreatedAt());
+            taskDTO.setCreator(creatorDTO);
+        }
+
         return taskDTO;
     }
 
