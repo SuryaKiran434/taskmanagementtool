@@ -22,6 +22,8 @@ public class JwtUtil {
 
     private final TokenBlacklistService tokenBlacklistService;
 
+    private static final long CLOCK_SKEW = 60000;
+
     public JwtUtil(TokenBlacklistService tokenBlacklistService) {
         this.tokenBlacklistService = tokenBlacklistService;
     }
@@ -46,29 +48,44 @@ public class JwtUtil {
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
+                .setAllowedClockSkewSeconds(CLOCK_SKEW / 1000)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
     }
 
     private Boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        return extractExpiration(token).before(new Date(System.currentTimeMillis() - CLOCK_SKEW));
     }
 
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(UserDetails userDetails, int userId) {
         Map<String, Object> claims = new HashMap<>();
         Collection<? extends GrantedAuthority> roles = userDetails.getAuthorities();
+        System.out.println("User roles being added to JWT: " + roles); // Debug log
         claims.put("roles", roles.stream().map(GrantedAuthority::getAuthority).toList());
+        claims.put("userId", userId);  // Add the actual user ID to claims
         return createToken(claims, userDetails.getUsername());
     }
 
+
     private String createToken(Map<String, Object> claims, String subject) {
+        System.out.println("createToken method called"); // Debug log
         final long expiration = 3600000; // 1 hour in milliseconds
+        System.out.println("Claims being set in JWT: " + claims); // Log the claims
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        return Jwts.builder()
+                .setSubject(userDetails.getUsername())
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + 604800000)) // 7 days in milliseconds
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -79,8 +96,8 @@ public class JwtUtil {
     }
 
     public String refreshToken(String token) {
-        if (tokenBlacklistService.isBlacklisted(token)) {
-            throw new IllegalArgumentException("Token is blacklisted");
+        if (isTokenExpired(token) || tokenBlacklistService.isBlacklisted(token)) {
+            throw new IllegalArgumentException("Token is invalid or blacklisted");
         }
         final Claims claims = extractAllClaims(token);
         claims.setIssuedAt(new Date(System.currentTimeMillis()));
