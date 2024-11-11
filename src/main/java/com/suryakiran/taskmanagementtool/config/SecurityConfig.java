@@ -46,7 +46,8 @@ public class SecurityConfig {
                     .csrf(AbstractHttpConfigurer::disable)
                     .cors(withDefaults())
                     .authorizeHttpRequests(requests -> requests
-                            .requestMatchers("/api/authenticate", "/api/refresh-token", "/api/logout", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll() // Added refresh-token and logout
+                            .requestMatchers("/api/authenticate", "/api/refresh-token", "/api/logout", "/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll() // Permitting some endpoints
+                            .requestMatchers("/api/users/reset-password").permitAll() // Allow reset-password without auth
                             .requestMatchers("/api/tasks/**").authenticated()
                             .anyRequest().authenticated())
                     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
