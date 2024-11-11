@@ -176,6 +176,23 @@ public class UserServiceImpl implements UserService {
         return ResponseEntity.ok(token);
     }
 
+    @Override
+    public void resetPassword(String email, String newPassword) {
+        logger.info("Resetting password for user with email: {}", email);
+
+        // Check if user exists with the provided email
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+
+        // Validate the new password before setting it
+        validatePassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
+
+        // Save the updated user
+        userRepository.save(user);
+        logger.info("Password reset successfully for email: {}", email);
+    }
+
 
     private void validatePassword(String password) {
         if (password == null || password.isEmpty()) {
