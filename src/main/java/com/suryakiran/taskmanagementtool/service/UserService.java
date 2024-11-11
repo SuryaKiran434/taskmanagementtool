@@ -15,4 +15,5 @@ public interface UserService {
     void deleteUser(int id);
     User assignAdminRoleToUser(int id);
     ResponseEntity<?> login(LoginRequest loginRequest);
+    void resetPassword(String email, String newPassword);
 }
