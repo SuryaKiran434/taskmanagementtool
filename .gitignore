@@ -1,5 +1,26 @@
 HELP.md
 target/
+
+### Secrets & credentials — never commit these ###
+.env
+.env.*
+!.env.example
+application-local.properties
+application-local.yml
+application-desktop.properties
+application-desktop.yml
+
+### Claude Code session files — may contain credentials in allow-lists ###
+.claude/
+
+### Uploaded user files ###
+uploads/
+
+### Log files ###
+*.log
+logs/
+
+### Maven wrapper (keep the jar, ignore lockfile) ###
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
