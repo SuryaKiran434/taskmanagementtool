@@ -2,29 +2,32 @@ package com.suryakiran.taskmanagementtool.util;
 
 import com.suryakiran.taskmanagementtool.repository.TaskRepository;
 import org.springframework.stereotype.Component;
-import java.security.SecureRandom;
-import java.util.HashSet;
-import java.util.Set;
 
+import java.security.SecureRandom;
+
+/**
+ * Generates unique 8-character alphanumeric task IDs.
+ * 36^8 = ~2.8 trillion possible values — collision probability is negligible.
+ * Uniqueness is guaranteed by checking the database on each generation.
+ */
 @Component
 public class UniqueIdGenerator {
 
     private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    private static final int ID_LENGTH = 3;
+    private static final int ID_LENGTH = 8;
     private static final SecureRandom RANDOM = new SecureRandom();
-    private final Set<String> generatedIds = new HashSet<>();
+
     private final TaskRepository taskRepository;
 
     public UniqueIdGenerator(TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
     }
 
-    public synchronized String generateUniqueId() {
+    public String generateUniqueId() {
         String id;
         do {
             id = generateRandomId();
-        } while (generatedIds.contains(id) || taskRepository.existsById(id));
-        generatedIds.add(id);
+        } while (taskRepository.existsById(id));
         return id;
     }
 

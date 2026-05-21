@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication(scanBasePackages = "com.suryakiran.taskmanagementtool")
 @EnableCaching
+@org.springframework.scheduling.annotation.EnableScheduling
 public class TaskmanagementtoolApplication {
 
 	private static final Logger logger = LoggerFactory.getLogger(TaskmanagementtoolApplication.class);

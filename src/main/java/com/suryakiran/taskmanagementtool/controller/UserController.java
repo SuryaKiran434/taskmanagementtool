@@ -1,19 +1,31 @@
 package com.suryakiran.taskmanagementtool.controller;
 
-import com.suryakiran.taskmanagementtool.dto.LoginRequest;
+import com.suryakiran.taskmanagementtool.dto.AdminCreateUserDTO;
+import com.suryakiran.taskmanagementtool.dto.ResetTokenDTO;
 import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.dto.UserRegistrationDTO;
 import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
 import com.suryakiran.taskmanagementtool.model.User;
+import com.suryakiran.taskmanagementtool.service.PasswordResetService;
 import com.suryakiran.taskmanagementtool.service.UserService;
 import com.suryakiran.taskmanagementtool.util.PasswordValidator;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 import java.util.List;
 
@@ -22,13 +34,19 @@ import java.util.List;
 public class UserController {
 
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
-    private final UserService userService;
 
-    public UserController(UserService userService) {
+    @Value("${app.upload.dir}")
+    private String uploadDir;
+
+    private final UserService userService;
+    private final PasswordResetService passwordResetService;
+
+    public UserController(UserService userService, PasswordResetService passwordResetService) {
         this.userService = userService;
+        this.passwordResetService = passwordResetService;
     }
 
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<List<UserDTO>> getAllUsers() {
         logger.info("Fetching all users");
@@ -38,22 +56,38 @@ public class UserController {
                 .body(users);
     }
 
-    @PreAuthorize("hasRole('ROLE_ADMIN') or #id == authentication.principal.id")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
     @GetMapping("/{id}")
     public User getUserById(@PathVariable int id, Authentication authentication) {
         logger.info("Fetching user with id: {}", id);
         return userService.getUserById(id);
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserDTO> getCurrentUser(Authentication authentication) {
+        logger.info("Fetching current user profile");
+        User user = userService.getUserByEmail(authentication.getName());
+        return ResponseEntity.ok(userService.convertToDTO(user));
+    }
+
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public User createUser(@RequestBody User user) {
-        logger.info("Creating user with email: {}", user.getEmail());
-        return userService.registerUser(user);
+    public ResponseEntity<UserDTO> createUser(@Valid @RequestBody AdminCreateUserDTO dto) {
+        logger.info("Admin creating user with email: {}", dto.getEmail());
+        User user = new User();
+        user.setFirstName(dto.getFirstName());
+        user.setLastName(dto.getLastName());
+        user.setEmail(dto.getEmail());
+        user.setPassword(dto.getPassword());
+        User created = userService.registerUser(user);
+        if (dto.isAssignAdmin()) {
+            created = userService.assignAdminRoleToUser(created.getId());
+        }
+        return ResponseEntity.status(201).body(userService.convertToDTO(created));
     }
 
     @PostMapping("/register")
-    public User registerUser(@RequestBody UserRegistrationDTO userRegistrationDTO) {
+    public User registerUser(@Valid @RequestBody UserRegistrationDTO userRegistrationDTO) {
         logger.info("Registering user with email: {}", userRegistrationDTO.getEmail());
         if (!PasswordValidator.validatePassword(userRegistrationDTO.getPassword())) {
             throw new IllegalArgumentException("Password does not meet complexity requirements");
@@ -66,45 +100,102 @@ public class UserController {
         return userService.registerUser(user);
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
-        logger.info("Attempting to log in user with email: {}", loginRequest.getEmail());
-        return userService.login(loginRequest);
+    /**
+     * Step 1 of password reset: request an OTP.
+     * Returns the OTP in the response body (until email delivery is implemented).
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ResetTokenDTO> forgotPassword(@RequestParam String email) {
+        logger.info("Forgot password request for email: {}", email);
+        try {
+            // Verify user exists before generating OTP
+            userService.getUserByEmail(email);
+            String otp = passwordResetService.generateOtp(email);
+            ResetTokenDTO response = new ResetTokenDTO(email, otp,
+                    "OTP generated. Use it within 15 minutes to reset your password.");
+            return ResponseEntity.ok(response);
+        } catch (UserNotFoundException e) {
+            // Return 200 to avoid user enumeration
+            return ResponseEntity.ok(new ResetTokenDTO(email, null,
+                    "If an account exists for this email, an OTP has been sent."));
+        }
     }
 
+    /**
+     * Step 2 of password reset: verify OTP and set new password.
+     */
     @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(@RequestParam String email, @RequestParam String newPassword) {
-        logger.info("Request to reset password for email: {}", email);
+    public ResponseEntity<String> resetPassword(
+            @RequestParam String email,
+            @RequestParam String token,
+            @RequestParam String newPassword) {
+        logger.info("Password reset attempt for email: {}", email);
+
+        if (!passwordResetService.validateOtp(email, token)) {
+            return ResponseEntity.status(400).body("Invalid or expired OTP. Please request a new one.");
+        }
+
         try {
             userService.resetPassword(email, newPassword);
-            return ResponseEntity.ok("Password reset successfully");
+            return ResponseEntity.ok("Password reset successfully.");
         } catch (UserNotFoundException e) {
-            logger.error("Error resetting password: {}", e.getMessage());
-            return ResponseEntity.status(404).body("User not found with the provided email");
+            return ResponseEntity.status(404).body("User not found with the provided email.");
         } catch (IllegalArgumentException e) {
             logger.error("Password validation failed: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    @PreAuthorize("hasRole('ROLE_ADMIN') or #id == authentication.principal.id")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
     @PutMapping("/{id}")
-    public User updateUser(@PathVariable int id, @RequestBody User userDetails, Authentication authentication) {
+    public User updateUser(@PathVariable int id, @Valid @RequestBody User userDetails, Authentication authentication) {
         logger.info("Updating user with id: {}", id);
         return userService.updateUser(id, userDetails);
     }
 
-    @PreAuthorize("hasRole('ROLE_ADMIN') or #id == authentication.principal.id")
+    @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
     @DeleteMapping("/{id}")
     public void deleteUser(@PathVariable int id, Authentication authentication) {
         logger.info("Deleting user with id: {}", id);
         userService.deleteUser(id);
     }
 
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/assign-admin")
     public User assignAdminRoleToUser(@PathVariable int id) {
         logger.info("Assigning admin role to user with id: {}", id);
         return userService.assignAdminRoleToUser(id);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{id}/remove-admin")
+    public User removeAdminRoleFromUser(@PathVariable int id) {
+        logger.info("Removing admin role from user with id: {}", id);
+        return userService.removeAdminRoleFromUser(id);
+    }
+
+    @PostMapping("/me/avatar")
+    public ResponseEntity<UserDTO> uploadAvatar(@RequestParam("file") MultipartFile file,
+                                                 Authentication authentication) throws IOException {
+        logger.info("Uploading avatar for user: {}", authentication.getName());
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().build();
+        }
+        String originalName = file.getOriginalFilename();
+        String ext = (originalName != null && originalName.contains("."))
+                ? originalName.substring(originalName.lastIndexOf('.')) : ".jpg";
+        String filename = UUID.randomUUID() + ext;
+
+        Path avatarDir = Paths.get(uploadDir, "avatars");
+        Files.createDirectories(avatarDir);
+        Files.copy(file.getInputStream(), avatarDir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+
+        String avatarUrl = "/uploads/avatars/" + filename;
+        User user = userService.getUserByEmail(authentication.getName());
+        user.setAvatarUrl(avatarUrl);
+        userService.updateUser(user.getId(), user);
+
+        return ResponseEntity.ok(userService.convertToDTO(user));
     }
 }

@@ -14,8 +14,9 @@ public class UserDTO {
     private String firstName;
     private String lastName;
     private String email;
-    private String password;
     private List<String> roles;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MM-dd-yyyy")
     private Date createdAt;
+
+    private String avatarUrl;
 }

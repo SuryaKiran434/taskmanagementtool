@@ -2,6 +2,7 @@ package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.repository.UserRepository;
+import com.suryakiran.taskmanagementtool.security.CustomUserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -32,7 +33,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                 });
 
         logger.info("User found with email: {}", email);
-        return new org.springframework.security.core.userdetails.User(
+        return new CustomUserDetails(
+                user.getId(),
                 user.getEmail(),
                 user.getPassword(),
                 Collections.unmodifiableList(

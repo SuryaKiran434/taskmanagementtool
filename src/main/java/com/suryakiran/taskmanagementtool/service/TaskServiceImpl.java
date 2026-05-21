@@ -1,14 +1,11 @@
 package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.dto.TaskDTO;
-import com.suryakiran.taskmanagementtool.dto.UserDTO;
+import com.suryakiran.taskmanagementtool.dto.TaskStatsDTO;
 import com.suryakiran.taskmanagementtool.exception.AuthenticationRequiredException;
 import com.suryakiran.taskmanagementtool.exception.TaskNotFoundException;
 import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
-import com.suryakiran.taskmanagementtool.model.Priority;
-import com.suryakiran.taskmanagementtool.model.Status;
-import com.suryakiran.taskmanagementtool.model.Task;
-import com.suryakiran.taskmanagementtool.model.User;
+import com.suryakiran.taskmanagementtool.model.*;
 import com.suryakiran.taskmanagementtool.repository.TaskRepository;
 import com.suryakiran.taskmanagementtool.repository.UserRepository;
 import com.suryakiran.taskmanagementtool.util.UniqueIdGenerator;
@@ -19,7 +16,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -32,15 +33,22 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final UniqueIdGenerator uniqueIdGenerator;
+    private final TaskConversionService taskConversionService;
+    private final ActivityLogService activityLogService;
 
     @Autowired
-    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository, UniqueIdGenerator uniqueIdGenerator) {
+    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository,
+                           UniqueIdGenerator uniqueIdGenerator, TaskConversionService taskConversionService,
+                           ActivityLogService activityLogService) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.uniqueIdGenerator = uniqueIdGenerator;
+        this.taskConversionService = taskConversionService;
+        this.activityLogService = activityLogService;
     }
 
     @Override
+    @Transactional
     public TaskDTO createTask(TaskDTO taskDTO, Authentication authentication) {
         logger.info("Creating task with title: {}", taskDTO.getTitle());
         if (!authentication.isAuthenticated()) {
@@ -48,22 +56,29 @@ public class TaskServiceImpl implements TaskService {
         }
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
-        Task task = convertToEntity(taskDTO);
+        Task task = taskConversionService.convertToEntity(taskDTO);
         task.setId(uniqueIdGenerator.generateUniqueId());
         task.setUser(user);
+        if (taskDTO.getAssigneeId() != null) {
+            User assignee = userRepository.findById(Long.valueOf(taskDTO.getAssigneeId()))
+                    .orElseThrow(() -> new UserNotFoundException("Assignee not found"));
+            task.setAssignee(assignee);
+        }
         Task savedTask = taskRepository.save(task);
+        activityLogService.log(savedTask.getId(), user, ActivityAction.TASK_CREATED,
+                null, savedTask.getTitle(), "Task created");
         logger.info("Task created with ID: {}", savedTask.getId());
-        return convertToDTO(savedTask);
+        return taskConversionService.convertToDTO(savedTask);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getAllTasks(Pageable pageable) {
-        logger.info("Retrieving all tasks without authentication");
-        Page<Task> tasks = taskRepository.findAll(pageable);
-        return tasks.map(this::convertToDTO);
+        return taskRepository.findAll(pageable).map(taskConversionService::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getAllTasks(Pageable pageable, Authentication authentication) {
         logger.info("Retrieving all tasks for user: {}", authentication.getName());
         if (!authentication.isAuthenticated()) {
@@ -71,30 +86,28 @@ public class TaskServiceImpl implements TaskService {
         }
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
-        Page<Task> tasks = taskRepository.findByUser(user, pageable);
-        return tasks.map(this::convertToDTO);
+        return taskRepository.findByUser(user, pageable).map(taskConversionService::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<TaskDTO> getTaskById(String id) {
-        logger.info("Fetching task by ID: {}", id);
-        Optional<Task> task = taskRepository.findById(id);
-        return task.map(this::convertToDTO);
+        return taskRepository.findById(id).map(taskConversionService::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<TaskDTO> getTaskById(String id, Authentication authentication) {
-        logger.info("Fetching task by ID: {}", id);
         if (!authentication.isAuthenticated()) {
             return getTaskById(id);
         }
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
-        Optional<Task> task = taskRepository.findByIdAndUser(id, user);
-        return task.map(this::convertToDTO);
+        return taskRepository.findByIdAndUser(id, user).map(taskConversionService::convertToDTO);
     }
 
     @Override
+    @Transactional
     public TaskDTO updateTask(String id, TaskDTO taskDTO, Authentication authentication) {
         logger.info("Updating task with ID: {}", id);
         if (!authentication.isAuthenticated()) {
@@ -104,19 +117,53 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Task task = taskRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
+
+        // Track meaningful changes for the activity log
+        Status oldStatus = task.getStatus();
+        Priority oldPriority = task.getPriority();
+
+        Integer oldAssigneeId = task.getAssignee() != null ? task.getAssignee().getId() : null;
+
         task.setTitle(taskDTO.getTitle());
         task.setDescription(taskDTO.getDescription());
         task.setStatus(taskDTO.getStatus());
         task.setPriority(taskDTO.getPriority());
-        task.setDueDate(taskDTO.getDueDate()); // Set dueDate
+        task.setDueDate(taskDTO.getDueDate());
+        task.setCategory(taskDTO.getCategory());
+        if (taskDTO.getAssigneeId() != null) {
+            User assignee = userRepository.findById(Long.valueOf(taskDTO.getAssigneeId()))
+                    .orElseThrow(() -> new UserNotFoundException("Assignee not found"));
+            task.setAssignee(assignee);
+        } else {
+            task.setAssignee(null);
+        }
         Task updatedTask = taskRepository.save(task);
+
+        Integer newAssigneeId = updatedTask.getAssignee() != null ? updatedTask.getAssignee().getId() : null;
+        if (!java.util.Objects.equals(oldAssigneeId, newAssigneeId)) {
+            activityLogService.log(id, user, ActivityAction.TASK_UPDATED,
+                    String.valueOf(oldAssigneeId), String.valueOf(newAssigneeId), "Assignee changed");
+        }
+
+        if (oldStatus != taskDTO.getStatus()) {
+            activityLogService.log(id, user, ActivityAction.STATUS_CHANGED,
+                    oldStatus.name(), taskDTO.getStatus().name(), "Status changed");
+        }
+        if (oldPriority != taskDTO.getPriority()) {
+            activityLogService.log(id, user, ActivityAction.PRIORITY_CHANGED,
+                    oldPriority.name(), taskDTO.getPriority().name(), "Priority changed");
+        }
+        activityLogService.log(id, user, ActivityAction.TASK_UPDATED,
+                null, null, "Task updated");
+
         logger.info("Task updated with ID: {}", updatedTask.getId());
-        return convertToDTO(updatedTask);
+        return taskConversionService.convertToDTO(updatedTask);
     }
 
     @Override
+    @Transactional
     public void deleteTask(String id, Authentication authentication) {
-        logger.info("Deleting task with ID: {}", id);
+        logger.info("Soft-deleting task with ID: {}", id);
         if (!authentication.isAuthenticated()) {
             throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
         }
@@ -124,27 +171,29 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Task task = taskRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
-        taskRepository.delete(task);
-        logger.info("Task deleted with ID: {}", id);
+        task.setDeletedAt(Instant.now());
+        taskRepository.save(task);
+        activityLogService.log(id, user, ActivityAction.TASK_DELETED, null, null, "Task soft-deleted");
+        logger.info("Task soft-deleted with ID: {}", id);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getTasks(Status status, Priority priority, Pageable pageable) {
-        logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
-        Page<Task> tasks = taskRepository.findByStatusOrPriority(status, priority, pageable);
-        return tasks.map(this::convertToDTO);
+        return taskRepository.findByStatusAndPriority(status, priority, pageable)
+                .map(taskConversionService::convertToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<TaskDTO> getTasks(Status status, Priority priority, Pageable pageable, Authentication authentication) {
-        logger.info("Filtering tasks with status: {} and priority: {}", status, priority);
         if (!authentication.isAuthenticated()) {
             return getTasks(status, priority, pageable);
         }
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
-        Page<Task> tasks = taskRepository.findByUserAndStatusAndPriority(user, status, priority, pageable);
-        return tasks.map(this::convertToDTO);
+        return taskRepository.findByUserAndStatusAndPriority(user, status, priority, pageable)
+                .map(taskConversionService::convertToDTO);
     }
 
     @Override
@@ -152,39 +201,87 @@ public class TaskServiceImpl implements TaskService {
         return taskRepository.existsByIdAndUserId(taskId, userId);
     }
 
-    private TaskDTO convertToDTO(Task task) {
-        TaskDTO taskDTO = new TaskDTO();
-        taskDTO.setId(task.getId());
-        taskDTO.setTitle(task.getTitle());
-        taskDTO.setDescription(task.getDescription());
-        taskDTO.setStatus(task.getStatus());
-        taskDTO.setPriority(task.getPriority());
-        taskDTO.setDueDate(task.getDueDate()); // Set dueDate
-
-        User creator = task.getUser();
-        if (creator != null) {
-            taskDTO.setCreatorFirstName(creator.getFirstName());
-            taskDTO.setCreatorLastName(creator.getLastName());
-            UserDTO creatorDTO = new UserDTO();
-            creatorDTO.setId(creator.getId());
-            creatorDTO.setFirstName(creator.getFirstName());
-            creatorDTO.setLastName(creator.getLastName());
-            creatorDTO.setEmail(creator.getEmail());
-            creatorDTO.setCreatedAt(creator.getCreatedAt());
-            taskDTO.setCreator(creatorDTO);
-        }
-
-        return taskDTO;
+    @Override
+    @Transactional
+    public TaskDTO restoreTask(String id, Authentication authentication) {
+        logger.info("Restoring task with ID: {}", id);
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
+        Task task = taskRepository.findByIdAndUser(id, user)
+                .orElseThrow(() -> new TaskNotFoundException("Task not found"));
+        task.setDeletedAt(null);
+        Task restoredTask = taskRepository.save(task);
+        activityLogService.log(id, user, ActivityAction.TASK_RESTORED, null, null, "Task restored");
+        logger.info("Task restored with ID: {}", id);
+        return taskConversionService.convertToDTO(restoredTask);
     }
 
-    private Task convertToEntity(TaskDTO taskDTO) {
-        Task task = new Task();
-        task.setId(taskDTO.getId());
-        task.setTitle(taskDTO.getTitle());
-        task.setDescription(taskDTO.getDescription());
-        task.setStatus(taskDTO.getStatus());
-        task.setPriority(taskDTO.getPriority());
-        task.setDueDate(taskDTO.getDueDate()); // Set dueDate
-        return task;
+    @Override
+    @Transactional(readOnly = true)
+    public Page<TaskDTO> searchTasks(String query, Pageable pageable, Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
+        return taskRepository.searchByUser(user, query, pageable)
+                .map(taskConversionService::convertToDTO);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TaskStatsDTO getTaskStats(Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
+        LocalDate today = LocalDate.now();
+        long total = taskRepository.countByUser(user);
+        long toDo = taskRepository.countByUserAndStatus(user, Status.TO_DO);
+        long inProgress = taskRepository.countByUserAndStatus(user, Status.IN_PROGRESS);
+        long complete = taskRepository.countByUserAndStatus(user, Status.COMPLETE);
+        long overdue = taskRepository.countByUserAndDueDateBeforeAndStatusNot(user, today, Status.COMPLETE);
+        return new TaskStatsDTO(total, toDo, inProgress, complete, overdue);
+    }
+
+    @Override
+    @Transactional
+    public int bulkUpdateTasks(List<String> taskIds, Status status, Priority priority, Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
+        int updated = 0;
+        for (String taskId : taskIds) {
+            Optional<Task> optTask = taskRepository.findByIdAndUser(taskId, user);
+            if (optTask.isPresent()) {
+                Task task = optTask.get();
+                if (status != null) task.setStatus(status);
+                if (priority != null) task.setPriority(priority);
+                taskRepository.save(task);
+                updated++;
+            }
+        }
+        return updated;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<TaskDTO> getTasksForUser(int userId, Pageable pageable) {
+        User user = userRepository.findById((long) userId)
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
+        return taskRepository.findByUser(user, pageable).map(taskConversionService::convertToDTO);
+    }
+
+    @Override
+    @Transactional
+    public int bulkDeleteTasks(List<String> taskIds, Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
+        int deleted = 0;
+        Instant now = Instant.now();
+        for (String taskId : taskIds) {
+            Optional<Task> optTask = taskRepository.findByIdAndUser(taskId, user);
+            if (optTask.isPresent()) {
+                Task task = optTask.get();
+                task.setDeletedAt(now);
+                taskRepository.save(task);
+                deleted++;
+            }
+        }
+        return deleted;
     }
 }
