@@ -33,7 +33,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain chain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain chain)
             throws ServletException, IOException {
 
         final String authorizationHeader = request.getHeader("Authorization");
@@ -45,9 +47,10 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             jwt = authorizationHeader.substring(7);
             try {
                 username = jwtUtil.extractUsername(jwt);
-                logger.info("Username extracted from token: {}", username);
+                logger.debug("JWT token present for user: {}", username);
             } catch (Exception e) {
-                logger.warn("Invalid JWT token: {}", e.getMessage());
+                // Log the reason but never the token value itself
+                logger.warn("Invalid JWT token on {} {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
             }
         }
 
@@ -56,30 +59,26 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
             boolean isTokenValid = jwtUtil.validateToken(jwt, userDetails);
-            logger.info("Token validation result: {}", isTokenValid);
 
             if (isTokenValid) {
                 List<String> roles = jwtUtil.extractRoles(jwt);
-                if (roles != null) {
-                    logger.info("Roles extracted from token: {}", roles);
+                if (roles != null && !roles.isEmpty()) {
                     List<SimpleGrantedAuthority> authorities = roles.stream()
                             .map(SimpleGrantedAuthority::new)
                             .toList();
-
-                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, authorities);
-                    usernamePasswordAuthenticationToken
-                            .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-                    logger.info("Authentication set for user: {}", username);
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    logger.debug("Authenticated user: {} with roles: {}", username, roles);
                 } else {
-                    logger.warn("No roles found in token for user: {}", username);
+                    logger.warn("Valid token but no roles found for user: {}", username);
                 }
             } else {
-                logger.warn("Token validation failed for token: {}", jwt);
+                // Token present but invalid — warn without revealing the token
+                logger.warn("Token validation failed for user: {} on {} {}",
+                        username, request.getMethod(), request.getRequestURI());
             }
-        } else {
-            logger.warn("Security context is already authenticated or username is null");
         }
 
         chain.doFilter(request, response);

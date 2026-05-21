@@ -5,6 +5,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,7 +19,9 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    @Value("#{environment.JWT_SECRET}")
+    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
+
+    @Value("${jwt.secret}")
     private String secret;
 
     private final TokenBlacklistService tokenBlacklistService;
@@ -61,17 +65,16 @@ public class JwtUtil {
     public String generateToken(UserDetails userDetails, int userId) {
         Map<String, Object> claims = new HashMap<>();
         Collection<? extends GrantedAuthority> roles = userDetails.getAuthorities();
-        System.out.println("User roles being added to JWT: " + roles); // Debug log
+        logger.debug("User roles being added to JWT: {}", roles);
         claims.put("roles", roles.stream().map(GrantedAuthority::getAuthority).toList());
-        claims.put("userId", userId);  // Add the actual user ID to claims
+        claims.put("userId", userId);
         return createToken(claims, userDetails.getUsername());
     }
 
 
     private String createToken(Map<String, Object> claims, String subject) {
-        System.out.println("createToken method called"); // Debug log
+        logger.debug("Creating JWT token for subject: {}", subject);
         final long expiration = 3600000; // 1 hour in milliseconds
-        System.out.println("Claims being set in JWT: " + claims); // Log the claims
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)

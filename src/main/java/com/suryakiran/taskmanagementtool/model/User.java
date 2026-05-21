@@ -40,8 +40,8 @@ public class User {
     private String email;
 
     @JsonIgnore
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$",
-            message = "Password must have at least 1 uppercase, 1 lowercase, 1 number, 1 special character and be at least 8 characters long")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$",
+            message = "Password must be at least 8 characters and include uppercase, lowercase, number, and a special character")
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
@@ -50,6 +50,9 @@ public class User {
     @CreationTimestamp
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "MM-dd-yyyy")
     private Date createdAt;
+
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

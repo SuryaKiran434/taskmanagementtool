@@ -1,12 +1,14 @@
 package com.suryakiran.taskmanagementtool.service;
 
 import com.suryakiran.taskmanagementtool.dto.TaskDTO;
-import com.suryakiran.taskmanagementtool.model.Status;
+import com.suryakiran.taskmanagementtool.dto.TaskStatsDTO;
 import com.suryakiran.taskmanagementtool.model.Priority;
+import com.suryakiran.taskmanagementtool.model.Status;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface TaskService {
@@ -20,4 +22,10 @@ public interface TaskService {
     Page<TaskDTO> getTasks(Status status, Priority priority, Pageable pageable);
     Page<TaskDTO> getTasks(Status status, Priority priority, Pageable pageable, Authentication authentication);
     boolean isTaskOwner(String taskId, int userId);
+    Page<TaskDTO> searchTasks(String query, Pageable pageable, Authentication authentication);
+    TaskStatsDTO getTaskStats(Authentication authentication);
+    TaskDTO restoreTask(String id, Authentication authentication);
+    int bulkUpdateTasks(List<String> taskIds, Status status, Priority priority, Authentication authentication);
+    int bulkDeleteTasks(List<String> taskIds, Authentication authentication);
+    Page<TaskDTO> getTasksForUser(int userId, Pageable pageable);
 }
