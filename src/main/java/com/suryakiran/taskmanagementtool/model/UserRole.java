@@ -13,7 +13,7 @@ import jakarta.persistence.*;
 public class UserRole {
     @Id
     @ManyToOne
-    @JoinColumn(name = "user_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "fk_user"))
+    @JoinColumn(name = "user_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "fk_user_role_user"))
     private User user;
 
     @Id
