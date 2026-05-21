@@ -1,0 +1,18 @@
+package com.suryakiran.taskmanagementtool.model;
+
+public enum ActivityAction {
+    TASK_CREATED,
+    TASK_UPDATED,
+    TASK_DELETED,
+    TASK_RESTORED,
+    STATUS_CHANGED,
+    PRIORITY_CHANGED,
+    DUE_DATE_CHANGED,
+    COMMENT_ADDED,
+    COMMENT_DELETED,
+    SUBTASK_ADDED,
+    SUBTASK_COMPLETED,
+    LABEL_ADDED,
+    LABEL_REMOVED,
+    PROJECT_ASSIGNED
+}
