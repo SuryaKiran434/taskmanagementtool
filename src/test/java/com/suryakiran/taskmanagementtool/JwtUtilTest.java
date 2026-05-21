@@ -49,7 +49,7 @@ class JwtUtilTest {
         when(userDetails.getUsername()).thenReturn(username);
         when(userDetails.getAuthorities()).thenReturn(Collections.emptyList());
 
-        String token = jwtUtil.generateToken(userDetails);
+        String token = jwtUtil.generateToken(userDetails, 1);
         assertNotNull(token);
     }
 
