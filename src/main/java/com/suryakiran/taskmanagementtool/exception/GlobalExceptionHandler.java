@@ -36,6 +36,20 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler(TaskNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTaskNotFoundException(TaskNotFoundException ex, WebRequest request) {
+        logger.error("Task not found: {}", ex.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFoundException(UserNotFoundException ex, WebRequest request) {
+        logger.error("User not found: {}", ex.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage());
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex, WebRequest request) {
         logger.error("An error occurred: {}", ex.getMessage());
@@ -54,6 +68,19 @@ public class GlobalExceptionHandler {
         logger.error("Token validation error: {}", ex.getMessage());
         return new ResponseEntity<>(ex.getMessage(), HttpStatus.UNAUTHORIZED);
     }
+
+    @ExceptionHandler(AuthenticationFailedException.class)
+    public ResponseEntity<String> handleAuthenticationFailedException(AuthenticationFailedException ex, WebRequest request) {
+        logger.error("Authentication failed: {}", ex.getMessage());
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity<String> handleAuthenticationRequiredException(AuthenticationRequiredException ex, WebRequest request) {
+        logger.error("Authentication required: {}", ex.getMessage());
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.UNAUTHORIZED);
+    }
+
     @ExceptionHandler(JsonProcessingException.class)
     public ResponseEntity<ErrorResponse> handleJsonProcessingException(JsonProcessingException ex, WebRequest request) {
         logger.error("JSON processing error: {}", ex.getMessage());

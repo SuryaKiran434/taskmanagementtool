@@ -1,6 +1,10 @@
 package com.suryakiran.taskmanagementtool;
 
+import com.suryakiran.taskmanagementtool.exception.AuthenticationFailedException;
+import com.suryakiran.taskmanagementtool.exception.AuthenticationRequiredException;
 import com.suryakiran.taskmanagementtool.exception.ErrorResponse;
+import com.suryakiran.taskmanagementtool.exception.TaskNotFoundException;
+import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
 import com.suryakiran.taskmanagementtool.exception.GlobalExceptionHandler;
 import com.suryakiran.taskmanagementtool.exception.NoTasksFoundException;
 import com.suryakiran.taskmanagementtool.exception.ResourceNotFoundException;
@@ -47,6 +51,43 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertEquals("No tasks found", response.getBody().getMessage());
+    }
+
+    @Test
+    void testHandleTaskNotFoundException() {
+        TaskNotFoundException ex = new TaskNotFoundException("Task not found");
+        ResponseEntity<ErrorResponse> response = globalExceptionHandler.handleTaskNotFoundException(ex, webRequest);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("Task not found", response.getBody().getMessage());
+    }
+
+    @Test
+    void testHandleUserNotFoundException() {
+        UserNotFoundException ex = new UserNotFoundException("User not found");
+        ResponseEntity<ErrorResponse> response = globalExceptionHandler.handleUserNotFoundException(ex, webRequest);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("User not found", response.getBody().getMessage());
+    }
+
+    @Test
+    void testHandleAuthenticationFailedException() {
+        AuthenticationFailedException ex =
+                new AuthenticationFailedException("Incorrect email or password", new IllegalStateException("bad credentials"));
+        ResponseEntity<String> response = globalExceptionHandler.handleAuthenticationFailedException(ex, webRequest);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Incorrect email or password", response.getBody());
+    }
+
+    @Test
+    void testHandleAuthenticationRequiredException() {
+        AuthenticationRequiredException ex = new AuthenticationRequiredException("Authentication required");
+        ResponseEntity<String> response = globalExceptionHandler.handleAuthenticationRequiredException(ex, webRequest);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Authentication required", response.getBody());
     }
 
     @Test

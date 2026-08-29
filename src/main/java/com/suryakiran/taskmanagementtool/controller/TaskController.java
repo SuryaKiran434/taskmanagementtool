@@ -49,18 +49,16 @@ public class TaskController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createTask(@Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
+    public ResponseEntity<TaskDTO> createTask(@Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
         logger.info("Creating task: {}", taskDTO.getTitle());
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).build();
         }
-        try {
-            TaskDTO createdTask = taskService.createTask(taskDTO, authentication);
-            return ResponseEntity.ok(createdTask);
-        } catch (Exception e) {
-            logger.error("Error creating task", e);
-            return ResponseEntity.status(500).body("Failed to create task. Please try again later.");
-        }
+        // No catch-all here: it used to turn every failure into a 500, including a
+        // missing assignee (UserNotFoundException) and invalid input, which hid the
+        // real status from callers and made GlobalExceptionHandler unreachable for
+        // this endpoint. Unexpected failures still become a 500 via the advice.
+        return ResponseEntity.ok(taskService.createTask(taskDTO, authentication));
     }
 
     @GetMapping
