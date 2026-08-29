@@ -87,7 +87,7 @@
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
-			<version>0.11.5</version>
+			<version>0.13.0</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
@@ -138,16 +138,15 @@
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>2.22.2</version>
-				<configuration>
-					<argLine>
-						--illegal-access=permit
-					</argLine>
-				</configuration>
-			</plugin>
+			<!--
+				maven-surefire-plugin is deliberately NOT pinned here: it is managed by
+				spring-boot-starter-parent so that it always stays aligned with the JUnit
+				version Boot pulls in. The previous 2.22.2 pin silently discovered ZERO
+				tests once Boot 3.5.x brought JUnit 5.13 ("OutputDirectoryProvider not
+				available"), so the build reported SUCCESS without running anything.
+				The old "illegal-access=permit" argLine was also a no-op: that JVM flag
+				was removed in JDK 17.
+			-->
 		</plugins>
 	</build>
 </project>
