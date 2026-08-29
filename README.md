@@ -338,8 +338,11 @@ Swagger UI and `/v3/api-docs/**` are also public.
 | GET | `/tasks/user/{userId}` | `ROLE_ADMIN` only |
 | GET | `/tasks/export` | CSV of the caller's tasks |
 
-Paged responses carry `X-Total-Count`, `X-Total-Pages`, `X-Page-Number` and
-`X-Page-Size` headers, which CORS exposes to the browser.
+The paged endpoints (`/tasks`, `/tasks/filter`, `/tasks/search`,
+`/tasks/user/{userId}`) return a **plain JSON array**, not a Spring `Page`
+envelope — paging metadata travels in `X-Total-Count`, `X-Total-Pages`,
+`X-Page-Number` and `X-Page-Size` headers, which CORS exposes to the browser.
+Standard `?page=` and `?size=` query parameters apply, capped at 50 rows.
 
 ### Projects — `/projects`
 
