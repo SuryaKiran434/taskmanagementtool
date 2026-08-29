@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.UUID;
 
 import java.util.List;
@@ -34,6 +35,15 @@ import java.util.List;
 public class UserController {
 
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
+    /**
+     * Extensions an avatar may be stored under. The value written into the filename is
+     * always one of these constants, never a substring of the client-supplied name, so
+     * nothing the client controls can reach the filesystem path.
+     */
+    private static final List<String> ALLOWED_AVATAR_EXTENSIONS =
+            List.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
+    private static final String DEFAULT_AVATAR_EXTENSION = ".jpg";
 
     @Value("${app.upload.dir}")
     private String uploadDir;
@@ -141,8 +151,10 @@ public class UserController {
         } catch (UserNotFoundException e) {
             return ResponseEntity.status(404).body("User not found with the provided email.");
         } catch (IllegalArgumentException e) {
-            logger.error("Password validation failed: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+            // Log the specific reason server-side; the client gets a fixed message so that
+            // internal detail carried on the exception never reaches the response body.
+            logger.error("Password reset rejected for email {}: {}", email, e.getMessage(), e);
+            return ResponseEntity.badRequest().body("Password does not meet complexity requirements.");
         }
     }
 
@@ -182,14 +194,22 @@ public class UserController {
         if (contentType == null || !contentType.startsWith("image/")) {
             return ResponseEntity.badRequest().build();
         }
-        String originalName = file.getOriginalFilename();
-        String ext = (originalName != null && originalName.contains("."))
-                ? originalName.substring(originalName.lastIndexOf('.')) : ".jpg";
-        String filename = UUID.randomUUID() + ext;
+        String filename = UUID.randomUUID() + safeAvatarExtension(file.getOriginalFilename());
 
-        Path avatarDir = Paths.get(uploadDir, "avatars");
+        Path avatarDir = Paths.get(uploadDir, "avatars").toAbsolutePath().normalize();
         Files.createDirectories(avatarDir);
-        Files.copy(file.getInputStream(), avatarDir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+
+        // Defence in depth: resolve against the canonical base directory and refuse anything
+        // that escapes it. Checked after normalize(), so "../" segments are already collapsed
+        // rather than merely stripped.
+        Path target = avatarDir.resolve(filename).normalize();
+        if (!target.startsWith(avatarDir)) {
+            logger.warn("Rejected avatar upload resolving outside the avatar directory for user: {}",
+                    authentication.getName());
+            return ResponseEntity.badRequest().build();
+        }
+
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
         String avatarUrl = "/uploads/avatars/" + filename;
         User user = userService.getUserByEmail(authentication.getName());
@@ -197,5 +217,40 @@ public class UserController {
         userService.updateUser(user.getId(), user);
 
         return ResponseEntity.ok(userService.convertToDTO(user));
+    }
+
+    /**
+     * Derives the extension an uploaded avatar is stored under.
+     *
+     * <p>The client-supplied filename is only ever <em>compared</em> against a fixed
+     * allowlist; the returned string is one of the {@link #ALLOWED_AVATAR_EXTENSIONS}
+     * constants or {@link #DEFAULT_AVATAR_EXTENSION}. Any directory component the client
+     * smuggled in ("photo.png/../../../etc/cron.d/job") is dropped before the comparison,
+     * and an unrecognised extension falls back to the default rather than being echoed.</p>
+     *
+     * @param originalFilename the name reported by the client, which is entirely untrusted
+     * @return a constant extension, safe to concatenate into a filename
+     */
+    private static String safeAvatarExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return DEFAULT_AVATAR_EXTENSION;
+        }
+        // Strip any path the client sent, using both separators: a Windows client may send
+        // a backslash-delimited path, and the server may run on either platform.
+        int lastSeparator = Math.max(originalFilename.lastIndexOf('/'), originalFilename.lastIndexOf('\\'));
+        String bareName = originalFilename.substring(lastSeparator + 1);
+
+        int dot = bareName.lastIndexOf('.');
+        if (dot < 0) {
+            return DEFAULT_AVATAR_EXTENSION;
+        }
+        String candidate = bareName.substring(dot).toLowerCase(Locale.ROOT);
+
+        for (String allowed : ALLOWED_AVATAR_EXTENSIONS) {
+            if (allowed.equals(candidate)) {
+                return allowed;
+            }
+        }
+        return DEFAULT_AVATAR_EXTENSION;
     }
 }
