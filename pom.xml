@@ -15,6 +15,17 @@
 	<description>Task Management Tool for general users and admins</description>
 	<properties>
 		<java.version>17</java.version>
+		<!--
+			SonarCloud (CI-based analysis). These live here rather than in a
+			sonar-project.properties file because sonar-maven-plugin does not read
+			that file at all: it takes its configuration from the POM and from
+			-D flags. Everything else (sonar.sources, sonar.tests, sonar.java.binaries,
+			sonar.java.libraries) is derived from the Maven model automatically.
+		-->
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+		<sonar.organization>suryakiran434</sonar.organization>
+		<sonar.projectKey>SuryaKiran434_taskmanagementtool</sonar.projectKey>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -147,6 +158,16 @@
 				The old "illegal-access=permit" argLine was also a no-op: that JVM flag
 				was removed in JDK 17.
 			-->
+			<!--
+				Version-pinned so that `mvnw sonar:sonar` in CI resolves a known
+				scanner instead of whatever the plugin-prefix lookup considers
+				latest that day.
+			-->
+			<plugin>
+				<groupId>org.sonarsource.scanner.maven</groupId>
+				<artifactId>sonar-maven-plugin</artifactId>
+				<version>5.1.0.4751</version>
+			</plugin>
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
