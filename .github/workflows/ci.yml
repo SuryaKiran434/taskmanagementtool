@@ -30,3 +30,43 @@ jobs:
           name: surefire-reports
           path: target/surefire-reports/
           if-no-files-found: ignore
+
+      # JaCoCo writes the report during the `test` phase above, so there is no
+      # extra Maven invocation here. Groundwork for SonarCloud, which reads the
+      # same jacoco.xml.
+      - name: Coverage summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET, pathlib, sys
+          f = pathlib.Path("target/site/jacoco/jacoco.xml")
+          if not f.exists():
+              print("### Coverage\n\n_No JaCoCo report was produced._")
+              sys.exit(0)
+          root = ET.parse(f).getroot()
+          rows = {}
+          for c in root.findall("counter"):
+              missed, covered = int(c.get("missed")), int(c.get("covered"))
+              total = missed + covered
+              rows[c.get("type")] = (covered, total, 100.0 * covered / total if total else 0.0)
+          print("### Coverage (JaCoCo)")
+          print()
+          line = rows.get("LINE")
+          if line:
+              print(f"**{line[2]:.1f}% of lines** ({line[0]}/{line[1]})")
+              print()
+          print("| Metric | Covered | Total | % |")
+          print("| --- | ---: | ---: | ---: |")
+          for k in ("INSTRUCTION", "BRANCH", "LINE", "METHOD", "CLASS"):
+              if k in rows:
+                  covered, total, pct = rows[k]
+                  print(f"| {k.title()} | {covered} | {total} | {pct:.1f}% |")
+          PY
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: target/site/jacoco/jacoco.xml
+          if-no-files-found: error

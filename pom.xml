@@ -147,6 +147,32 @@
 				The old "illegal-access=permit" argLine was also a no-op: that JVM flag
 				was removed in JDK 17.
 			-->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.13</version>
+				<executions>
+					<!--
+						prepare-agent sets the "argLine" property to the JaCoCo javaagent
+						flags. Surefire picks that property up on its own, so neither this
+						POM nor the CI workflow may define an argLine of its own: doing so
+						drops the agent and every class reports 0% coverage.
+					-->
+					<execution>
+						<id>jacoco-prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 </project>
