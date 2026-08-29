@@ -3,7 +3,6 @@ package com.suryakiran.taskmanagementtool.util;
 import com.suryakiran.taskmanagementtool.service.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,12 +49,12 @@ public class JwtUtil {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .setAllowedClockSkewSeconds(CLOCK_SKEW / 1000)
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .clockSkewSeconds(CLOCK_SKEW / 1000)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     private Boolean isTokenExpired(String token) {
@@ -76,20 +75,24 @@ public class JwtUtil {
         logger.debug("Creating JWT token for subject: {}", subject);
         final long expiration = 3600000; // 1 hour in milliseconds
         return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .claims(claims)
+                .subject(subject)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                // HS256 is named explicitly on purpose. jjwt's single-argument
+                // signWith(key) derives the algorithm from the key length, which for the
+                // secrets this app uses (>= 384 bits) would silently upgrade tokens to
+                // HS384 and invalidate every token already in circulation.
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
         return Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 604800000)) // 7 days in milliseconds
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + 604800000)) // 7 days in milliseconds
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -103,11 +106,16 @@ public class JwtUtil {
             throw new IllegalArgumentException("Token is invalid or blacklisted");
         }
         final Claims claims = extractAllClaims(token);
-        claims.setIssuedAt(new Date(System.currentTimeMillis()));
-        claims.setExpiration(new Date(System.currentTimeMillis() + 3600000)); // 1 hour in milliseconds
+        // Claims became immutable in jjwt 0.12, so the old claims.setIssuedAt(..) /
+        // claims.setExpiration(..) mutation is copied into a fresh map instead.
+        Map<String, Object> refreshedClaims = new HashMap<>(claims);
+        refreshedClaims.remove(Claims.ISSUED_AT);
+        refreshedClaims.remove(Claims.EXPIRATION);
         return Jwts.builder()
-                .setClaims(claims)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .claims(refreshedClaims)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + 3600000)) // 1 hour in milliseconds
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
