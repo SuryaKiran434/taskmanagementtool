@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +55,11 @@ public class User {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
+    // Kept EAGER on purpose — see CustomUserDetailsService / UserConversionService, which read
+    // roles on detached User instances (spring.jpa.open-in-view=false), and UserController, which
+    // serialises User entities directly. @BatchSize makes the eager load cost one IN-query per
+    // batch of users instead of one query per user when several users are loaded together.
+    @BatchSize(size = 50)
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",

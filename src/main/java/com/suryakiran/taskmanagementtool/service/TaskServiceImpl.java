@@ -231,12 +231,21 @@ public class TaskServiceImpl implements TaskService {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         LocalDate today = LocalDate.now();
-        long total = taskRepository.countByUser(user);
-        long toDo = taskRepository.countByUserAndStatus(user, Status.TO_DO);
-        long inProgress = taskRepository.countByUserAndStatus(user, Status.IN_PROGRESS);
-        long complete = taskRepository.countByUserAndStatus(user, Status.COMPLETE);
-        long overdue = taskRepository.countByUserAndDueDateBeforeAndStatusNot(user, today, Status.COMPLETE);
-        return new TaskStatsDTO(total, toDo, inProgress, complete, overdue);
+        // One conditional-aggregation pass over the user's rows, instead of five COUNT queries
+        // scanning the same rows five times.
+        TaskRepository.TaskStatsProjection stats = taskRepository.getStatsByUser(
+                user, Status.TO_DO, Status.IN_PROGRESS, Status.COMPLETE, today);
+        return new TaskStatsDTO(
+                orZero(stats.getTotal()),
+                orZero(stats.getToDo()),
+                orZero(stats.getInProgress()),
+                orZero(stats.getComplete()),
+                orZero(stats.getOverdue()));
+    }
+
+    /** SUM(...) is NULL when the user has no tasks at all; the DTO contract is zeroes. */
+    private static long orZero(Long value) {
+        return value == null ? 0L : value;
     }
 
     @Override
@@ -244,18 +253,19 @@ public class TaskServiceImpl implements TaskService {
     public int bulkUpdateTasks(List<String> taskIds, Status status, Priority priority, Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
-        int updated = 0;
-        for (String taskId : taskIds) {
-            Optional<Task> optTask = taskRepository.findByIdAndUser(taskId, user);
-            if (optTask.isPresent()) {
-                Task task = optTask.get();
-                if (status != null) task.setStatus(status);
-                if (priority != null) task.setPriority(priority);
-                taskRepository.save(task);
-                updated++;
-            }
+        if (taskIds == null || taskIds.isEmpty()) {
+            return 0;
         }
-        return updated;
+        // Load the whole batch in one round trip. The finder applies the same ownership and
+        // soft-delete predicates as findByIdAndUser, so a task belonging to someone else is
+        // never returned and therefore never modified or counted.
+        List<Task> tasks = taskRepository.findAllByIdInAndUser(taskIds, user);
+        for (Task task : tasks) {
+            if (status != null) task.setStatus(status);
+            if (priority != null) task.setPriority(priority);
+        }
+        taskRepository.saveAll(tasks);
+        return tasks.size();
     }
 
     @Override
@@ -271,17 +281,16 @@ public class TaskServiceImpl implements TaskService {
     public int bulkDeleteTasks(List<String> taskIds, Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
-        int deleted = 0;
-        Instant now = Instant.now();
-        for (String taskId : taskIds) {
-            Optional<Task> optTask = taskRepository.findByIdAndUser(taskId, user);
-            if (optTask.isPresent()) {
-                Task task = optTask.get();
-                task.setDeletedAt(now);
-                taskRepository.save(task);
-                deleted++;
-            }
+        if (taskIds == null || taskIds.isEmpty()) {
+            return 0;
         }
-        return deleted;
+        Instant now = Instant.now();
+        // Same ownership/soft-delete predicates as findByIdAndUser, applied to the batch at once.
+        List<Task> tasks = taskRepository.findAllByIdInAndUser(taskIds, user);
+        for (Task task : tasks) {
+            task.setDeletedAt(now);
+        }
+        taskRepository.saveAll(tasks);
+        return tasks.size();
     }
 }
