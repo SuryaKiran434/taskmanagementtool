@@ -26,7 +26,11 @@ import java.util.Set;
         @Index(name = "idx_task_due_date", columnList = "due_date"),
         @Index(name = "idx_task_deleted_at", columnList = "deleted_at"),
         @Index(name = "idx_task_project_id", columnList = "project_id"),
-        @Index(name = "idx_task_assignee_id", columnList = "assignee_id")
+        @Index(name = "idx_task_assignee_id", columnList = "assignee_id"),
+        // Nearly every read filters user_id AND deleted_at together, usually with status.
+        // A composite covering index serves those predicates in one seek instead of
+        // intersecting the single-column indexes.
+        @Index(name = "idx_task_user_active_status", columnList = "user_id, deleted_at, status")
 })
 @NoArgsConstructor
 @AllArgsConstructor

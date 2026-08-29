@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -172,12 +173,47 @@ class TaskServiceImplTest {
     void testBulkDelete_Success() {
         when(authentication.getName()).thenReturn("test@example.com");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
-        when(taskRepository.findByIdAndUser("task-1", user)).thenReturn(Optional.of(task));
-        when(taskRepository.save(any(Task.class))).thenReturn(task);
+        // Bulk ops now load the whole batch in one ownership-scoped query instead of one per id.
+        when(taskRepository.findAllByIdInAndUser(java.util.List.of("task-1"), user))
+                .thenReturn(java.util.List.of(task));
+        when(taskRepository.saveAll(anyList())).thenReturn(java.util.List.of(task));
 
         int deleted = taskService.bulkDeleteTasks(java.util.List.of("task-1"), authentication);
 
         assertEquals(1, deleted);
         assertNotNull(task.getDeletedAt());
+        // The per-item lookup/save path must not be used any more.
+        verify(taskRepository, never()).findByIdAndUser(anyString(), any());
+        verify(taskRepository, times(1)).findAllByIdInAndUser(anyList(), any());
+    }
+
+    @Test
+    void testBulkDelete_EmptyListDoesNotHitTheDatabase() {
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        assertEquals(0, taskService.bulkDeleteTasks(java.util.List.of(), authentication));
+        assertEquals(0, taskService.bulkUpdateTasks(java.util.List.of(), Status.COMPLETE, null, authentication));
+
+        verify(taskRepository, never()).findAllByIdInAndUser(anyList(), any());
+    }
+
+    @Test
+    void testBulkUpdate_OnlyAppliesToTasksTheScopedQueryReturns() {
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        // "someone-elses-task" is filtered out by the ownership predicate in the query.
+        when(taskRepository.findAllByIdInAndUser(
+                java.util.List.of("task-1", "someone-elses-task"), user))
+                .thenReturn(java.util.List.of(task));
+        when(taskRepository.saveAll(anyList())).thenReturn(java.util.List.of(task));
+
+        int updated = taskService.bulkUpdateTasks(
+                java.util.List.of("task-1", "someone-elses-task"),
+                Status.COMPLETE, Priority.HIGH, authentication);
+
+        assertEquals(1, updated, "only tasks returned by the ownership-scoped query may be counted");
+        assertEquals(Status.COMPLETE, task.getStatus());
+        assertEquals(Priority.HIGH, task.getPriority());
     }
 }
