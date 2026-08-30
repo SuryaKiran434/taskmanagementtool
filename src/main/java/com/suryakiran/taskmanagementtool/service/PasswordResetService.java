@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
@@ -33,6 +34,10 @@ public class PasswordResetService {
      * Any previous OTP for the same email is overwritten.
      */
     public String generateOtp(String email) {
+        // Stated rather than assumed: both callers bind this from a required @RequestParam,
+        // so a null here is a programming error, not a request the user can make. Without the
+        // precondition the toLowerCase below is an unguarded dereference.
+        Objects.requireNonNull(email, "email must not be null");
         pruneExpired();
         String otp = String.format("%0" + OTP_LENGTH + "d",
                 secureRandom.nextInt((int) Math.pow(10, OTP_LENGTH)));
@@ -47,6 +52,7 @@ public class PasswordResetService {
      * Removes the entry on successful validation (one-time use).
      */
     public boolean validateOtp(String email, String otp) {
+        Objects.requireNonNull(email, "email must not be null");
         pruneExpired();
         OtpEntry entry = otpStore.get(email.toLowerCase());
         if (entry == null) {
