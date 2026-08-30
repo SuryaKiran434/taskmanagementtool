@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @RestController
 @RequestMapping("/api/tasks/{taskId}/comments")
 public class CommentController {
@@ -25,7 +27,7 @@ public class CommentController {
     @GetMapping
     public ResponseEntity<List<CommentDTO>> getComments(@PathVariable String taskId,
                                                         Authentication authentication) {
-        logger.debug("GET comments for task: {}", taskId);
+        logger.debug("GET comments for task: {}", sanitize(taskId));
         return ResponseEntity.ok(commentService.getComments(taskId, authentication));
     }
 
@@ -33,7 +35,7 @@ public class CommentController {
     public ResponseEntity<CommentDTO> addComment(@PathVariable String taskId,
                                                   @Valid @RequestBody CommentDTO dto,
                                                   Authentication authentication) {
-        logger.info("POST comment on task: {} by: {}", taskId, authentication.getName());
+        logger.info("POST comment on task: {} by: {}", sanitize(taskId), sanitize(authentication.getName()));
         return ResponseEntity.ok(commentService.addComment(taskId, dto, authentication));
     }
 
@@ -42,7 +44,8 @@ public class CommentController {
                                                     @PathVariable Long commentId,
                                                     @Valid @RequestBody CommentDTO dto,
                                                     Authentication authentication) {
-        logger.info("PUT comment: {} on task: {} by: {}", commentId, taskId, authentication.getName());
+        logger.info("PUT comment: {} on task: {} by: {}", commentId, sanitize(taskId),
+                sanitize(authentication.getName()));
         return ResponseEntity.ok(commentService.updateComment(taskId, commentId, dto, authentication));
     }
 
@@ -50,7 +53,8 @@ public class CommentController {
     public ResponseEntity<Void> deleteComment(@PathVariable String taskId,
                                               @PathVariable Long commentId,
                                               Authentication authentication) {
-        logger.info("DELETE comment: {} on task: {} by: {}", commentId, taskId, authentication.getName());
+        logger.info("DELETE comment: {} on task: {} by: {}", commentId, sanitize(taskId),
+                sanitize(authentication.getName()));
         commentService.deleteComment(taskId, commentId, authentication);
         return ResponseEntity.noContent().build();
     }

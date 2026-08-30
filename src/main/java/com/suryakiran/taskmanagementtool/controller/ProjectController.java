@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
@@ -28,7 +30,7 @@ public class ProjectController {
     @PostMapping
     public ResponseEntity<ProjectDTO> createProject(@Valid @RequestBody ProjectDTO dto,
                                                      Authentication authentication) {
-        logger.info("Creating project: {}", dto.getName());
+        logger.info("Creating project: {}", sanitize(dto.getName()));
         return ResponseEntity.ok(projectService.createProject(dto, authentication));
     }
 

@@ -4,6 +4,7 @@ import com.suryakiran.taskmanagementtool.dto.AdminCreateUserDTO;
 import com.suryakiran.taskmanagementtool.dto.ResetTokenDTO;
 import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.dto.UserRegistrationDTO;
+import com.suryakiran.taskmanagementtool.dto.UserUpdateDTO;
 import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.service.PasswordResetService;
@@ -29,6 +30,8 @@ import java.util.Locale;
 import java.util.UUID;
 
 import java.util.List;
+
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @RestController
 @RequestMapping("/api/users")
@@ -83,7 +86,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<UserDTO> createUser(@Valid @RequestBody AdminCreateUserDTO dto) {
-        logger.info("Admin creating user with email: {}", dto.getEmail());
+        logger.info("Admin creating user with email: {}", sanitize(dto.getEmail()));
         User user = new User();
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
@@ -98,7 +101,7 @@ public class UserController {
 
     @PostMapping("/register")
     public User registerUser(@Valid @RequestBody UserRegistrationDTO userRegistrationDTO) {
-        logger.info("Registering user with email: {}", userRegistrationDTO.getEmail());
+        logger.info("Registering user with email: {}", sanitize(userRegistrationDTO.getEmail()));
         if (!PasswordValidator.validatePassword(userRegistrationDTO.getPassword())) {
             throw new IllegalArgumentException("Password does not meet complexity requirements");
         }
@@ -116,7 +119,7 @@ public class UserController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<ResetTokenDTO> forgotPassword(@RequestParam String email) {
-        logger.info("Forgot password request for email: {}", email);
+        logger.info("Forgot password request for email: {}", sanitize(email));
         try {
             // Verify user exists before generating OTP
             userService.getUserByEmail(email);
@@ -139,7 +142,7 @@ public class UserController {
             @RequestParam String email,
             @RequestParam String token,
             @RequestParam String newPassword) {
-        logger.info("Password reset attempt for email: {}", email);
+        logger.info("Password reset attempt for email: {}", sanitize(email));
 
         if (!passwordResetService.validateOtp(email, token)) {
             return ResponseEntity.status(400).body("Invalid or expired OTP. Please request a new one.");
@@ -153,15 +156,25 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             // Log the specific reason server-side; the client gets a fixed message so that
             // internal detail carried on the exception never reaches the response body.
-            logger.error("Password reset rejected for email {}: {}", email, e.getMessage(), e);
+            logger.error("Password reset rejected for email {}: {}", sanitize(email), e.getMessage(), e);
             return ResponseEntity.badRequest().body("Password does not meet complexity requirements.");
         }
     }
 
     @PreAuthorize("hasRole('ADMIN') or #id == authentication.principal.id")
     @PutMapping("/{id}")
-    public User updateUser(@PathVariable int id, @Valid @RequestBody User userDetails, Authentication authentication) {
+    public User updateUser(@PathVariable int id, @Valid @RequestBody UserUpdateDTO update,
+                           Authentication authentication) {
         logger.info("Updating user with id: {}", id);
+        // Mapped across one field at a time on purpose. Binding the User entity directly let
+        // a caller send "roles" in the body, which updateUser then copied onto the persisted
+        // user -- self-service privilege escalation. The DTO has no setter for roles, id,
+        // createdAt or tasks, so those cannot arrive at all. See UserUpdateDTO.
+        User userDetails = new User();
+        userDetails.setFirstName(update.getFirstName());
+        userDetails.setLastName(update.getLastName());
+        userDetails.setEmail(update.getEmail());
+        userDetails.setPassword(update.getPassword());
         return userService.updateUser(id, userDetails);
     }
 
@@ -189,7 +202,7 @@ public class UserController {
     @PostMapping("/me/avatar")
     public ResponseEntity<UserDTO> uploadAvatar(@RequestParam("file") MultipartFile file,
                                                  Authentication authentication) throws IOException {
-        logger.info("Uploading avatar for user: {}", authentication.getName());
+        logger.info("Uploading avatar for user: {}", sanitize(authentication.getName()));
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             return ResponseEntity.badRequest().build();
@@ -205,7 +218,7 @@ public class UserController {
         Path target = avatarDir.resolve(filename).normalize();
         if (!target.startsWith(avatarDir)) {
             logger.warn("Rejected avatar upload resolving outside the avatar directory for user: {}",
-                    authentication.getName());
+                    sanitize(authentication.getName()));
             return ResponseEntity.badRequest().build();
         }
 

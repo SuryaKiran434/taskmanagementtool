@@ -7,7 +7,10 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 /**
  * Manages OTP-based password reset tokens.
@@ -31,11 +34,15 @@ public class PasswordResetService {
      * Any previous OTP for the same email is overwritten.
      */
     public String generateOtp(String email) {
+        // Stated rather than assumed: both callers bind this from a required @RequestParam,
+        // so a null here is a programming error, not a request the user can make. Without the
+        // precondition the toLowerCase below is an unguarded dereference.
+        Objects.requireNonNull(email, "email must not be null");
         pruneExpired();
         String otp = String.format("%0" + OTP_LENGTH + "d",
                 secureRandom.nextInt((int) Math.pow(10, OTP_LENGTH)));
         otpStore.put(email.toLowerCase(), new OtpEntry(otp, Instant.now().plusSeconds(OTP_TTL_SECONDS)));
-        logger.info("OTP generated for email: {}", email);
+        logger.info("OTP generated for email: {}", sanitize(email));
         return otp;
     }
 
@@ -45,23 +52,24 @@ public class PasswordResetService {
      * Removes the entry on successful validation (one-time use).
      */
     public boolean validateOtp(String email, String otp) {
+        Objects.requireNonNull(email, "email must not be null");
         pruneExpired();
         OtpEntry entry = otpStore.get(email.toLowerCase());
         if (entry == null) {
-            logger.warn("OTP validation failed: no OTP found for email: {}", email);
+            logger.warn("OTP validation failed: no OTP found for email: {}", sanitize(email));
             return false;
         }
         if (Instant.now().isAfter(entry.expiry())) {
             otpStore.remove(email.toLowerCase());
-            logger.warn("OTP validation failed: OTP expired for email: {}", email);
+            logger.warn("OTP validation failed: OTP expired for email: {}", sanitize(email));
             return false;
         }
         if (!entry.otp().equals(otp)) {
-            logger.warn("OTP validation failed: incorrect OTP for email: {}", email);
+            logger.warn("OTP validation failed: incorrect OTP for email: {}", sanitize(email));
             return false;
         }
         otpStore.remove(email.toLowerCase()); // one-time use
-        logger.info("OTP validated successfully for email: {}", email);
+        logger.info("OTP validated successfully for email: {}", sanitize(email));
         return true;
     }
 

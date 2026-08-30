@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @RestController
 @RequestMapping("/api/labels")
 public class LabelController {
@@ -24,14 +26,14 @@ public class LabelController {
 
     @GetMapping
     public ResponseEntity<List<LabelDTO>> getMyLabels(Authentication authentication) {
-        logger.debug("GET labels for user: {}", authentication.getName());
+        logger.debug("GET labels for user: {}", sanitize(authentication.getName()));
         return ResponseEntity.ok(labelService.getMyLabels(authentication));
     }
 
     @PostMapping
     public ResponseEntity<LabelDTO> createLabel(@Valid @RequestBody LabelDTO dto,
                                                  Authentication authentication) {
-        logger.info("POST label '{}' by: {}", dto.getName(), authentication.getName());
+        logger.info("POST label '{}' by: {}", sanitize(dto.getName()), sanitize(authentication.getName()));
         return ResponseEntity.ok(labelService.createLabel(dto, authentication));
     }
 
@@ -39,13 +41,13 @@ public class LabelController {
     public ResponseEntity<LabelDTO> updateLabel(@PathVariable Long id,
                                                 @Valid @RequestBody LabelDTO dto,
                                                 Authentication authentication) {
-        logger.info("PUT label: {} by: {}", id, authentication.getName());
+        logger.info("PUT label: {} by: {}", id, sanitize(authentication.getName()));
         return ResponseEntity.ok(labelService.updateLabel(id, dto, authentication));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLabel(@PathVariable Long id, Authentication authentication) {
-        logger.info("DELETE label: {} by: {}", id, authentication.getName());
+        logger.info("DELETE label: {} by: {}", id, sanitize(authentication.getName()));
         labelService.deleteLabel(id, authentication);
         return ResponseEntity.noContent().build();
     }
@@ -54,7 +56,8 @@ public class LabelController {
     public ResponseEntity<List<LabelDTO>> addToTask(@PathVariable String taskId,
                                                     @PathVariable Long labelId,
                                                     Authentication authentication) {
-        logger.info("Add label {} to task: {} by: {}", labelId, taskId, authentication.getName());
+        logger.info("Add label {} to task: {} by: {}", labelId, sanitize(taskId),
+                sanitize(authentication.getName()));
         return ResponseEntity.ok(labelService.addLabelToTask(taskId, labelId, authentication));
     }
 
@@ -62,7 +65,8 @@ public class LabelController {
     public ResponseEntity<List<LabelDTO>> removeFromTask(@PathVariable String taskId,
                                                          @PathVariable Long labelId,
                                                          Authentication authentication) {
-        logger.info("Remove label {} from task: {} by: {}", labelId, taskId, authentication.getName());
+        logger.info("Remove label {} from task: {} by: {}", labelId, sanitize(taskId),
+                sanitize(authentication.getName()));
         return ResponseEntity.ok(labelService.removeLabelFromTask(taskId, labelId, authentication));
     }
 }
