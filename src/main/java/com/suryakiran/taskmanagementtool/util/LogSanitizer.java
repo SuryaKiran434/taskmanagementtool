@@ -1,5 +1,7 @@
 package com.suryakiran.taskmanagementtool.util;
 
+import java.util.Objects;
+
 /**
  * Makes an untrusted value safe to write into a log line.
  *
@@ -55,10 +57,11 @@ public final class LogSanitizer {
      * @return the sanitised text, never {@code null} and never containing a line break
      */
     public static String sanitize(Object value) {
-        if (value == null) {
-            return NULL_PLACEHOLDER;
-        }
-        String text = value.toString();
+        // Objects.toString rather than an `if (value == null)` of our own: an explicit null
+        // branch here is a fact the analyser propagates back to every caller, so guarding
+        // this method's own argument would make each logged variable "possibly null" at its
+        // source and raise a null-dereference bug on code that cannot actually receive null.
+        String text = Objects.toString(value, NULL_PLACEHOLDER);
         if (text.length() > MAX_LENGTH) {
             text = text.substring(0, MAX_LENGTH) + TRUNCATION_MARKER;
         }
