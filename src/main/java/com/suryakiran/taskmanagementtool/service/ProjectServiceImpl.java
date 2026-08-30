@@ -50,7 +50,7 @@ public class ProjectServiceImpl {
         ownerMember.setRole(ProjectMemberRole.OWNER);
         projectMemberRepository.save(ownerMember);
 
-        logger.info("Project created: {} by user: {}", saved.getId(), owner.getEmail());
+        logger.info("Project created: {} by user id: {}", saved.getId(), owner.getId());
         return toDTO(saved);
     }
 

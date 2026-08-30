@@ -37,15 +37,16 @@ public class LabelServiceImpl {
     }
 
     public List<LabelDTO> getMyLabels(Authentication authentication) {
-        logger.debug("Fetching labels for user: {}", sanitize(authentication.getName()));
+        // Logged after the lookup rather than before it, so the line names the user by id.
         User user = getUser(authentication.getName());
+        logger.debug("Fetching labels for user id: {}", user.getId());
         return labelRepository.findByUser(user).stream().map(this::toDTO).toList();
     }
 
     @Transactional
     public LabelDTO createLabel(LabelDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Creating label '{}' for user: {}", sanitize(dto.getName()), sanitize(user.getEmail()));
+        logger.info("Creating label '{}' for user id: {}", sanitize(dto.getName()), user.getId());
         if (labelRepository.existsByNameAndUser(dto.getName(), user)) {
             throw new IllegalArgumentException("Label with this name already exists");
         }
@@ -54,14 +55,14 @@ public class LabelServiceImpl {
         label.setColor(dto.getColor());
         label.setUser(user);
         LabelDTO created = toDTO(labelRepository.save(label));
-        logger.info("Label {} created for user: {}", created.getId(), sanitize(user.getEmail()));
+        logger.info("Label {} created for user id: {}", created.getId(), user.getId());
         return created;
     }
 
     @Transactional
     public LabelDTO updateLabel(Long id, LabelDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Updating label: {} for user: {}", id, sanitize(user.getEmail()));
+        logger.info("Updating label: {} for user id: {}", id, user.getId());
         Label label = labelRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
         label.setName(dto.getName());
@@ -72,7 +73,7 @@ public class LabelServiceImpl {
     @Transactional
     public void deleteLabel(Long id, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Deleting label: {} for user: {}", id, sanitize(user.getEmail()));
+        logger.info("Deleting label: {} for user id: {}", id, user.getId());
         Label label = labelRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
         labelRepository.delete(label);
@@ -82,8 +83,8 @@ public class LabelServiceImpl {
     @Transactional
     public List<LabelDTO> addLabelToTask(String taskId, Long labelId, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Adding label: {} to task: {} by user: {}", labelId, sanitize(taskId),
-                sanitize(user.getEmail()));
+        logger.info("Adding label: {} to task: {} by user id: {}", labelId, sanitize(taskId),
+                user.getId());
         Task task = taskRepository.findByIdAndUser(taskId, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         Label label = labelRepository.findByIdAndUser(labelId, user)
@@ -98,8 +99,8 @@ public class LabelServiceImpl {
     @Transactional
     public List<LabelDTO> removeLabelFromTask(String taskId, Long labelId, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Removing label: {} from task: {} by user: {}", labelId, sanitize(taskId),
-                sanitize(user.getEmail()));
+        logger.info("Removing label: {} from task: {} by user id: {}", labelId, sanitize(taskId),
+                user.getId());
         Task task = taskRepository.findByIdAndUser(taskId, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         Label label = labelRepository.findByIdAndUser(labelId, user)

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @RestController
@@ -35,7 +36,7 @@ public class CommentController {
     public ResponseEntity<CommentDTO> addComment(@PathVariable String taskId,
                                                   @Valid @RequestBody CommentDTO dto,
                                                   Authentication authentication) {
-        logger.info("POST comment on task: {} by: {}", sanitize(taskId), sanitize(authentication.getName()));
+        logger.info("POST comment on task: {} by: {}", sanitize(taskId), maskEmail(authentication.getName()));
         return ResponseEntity.ok(commentService.addComment(taskId, dto, authentication));
     }
 
@@ -45,7 +46,7 @@ public class CommentController {
                                                     @Valid @RequestBody CommentDTO dto,
                                                     Authentication authentication) {
         logger.info("PUT comment: {} on task: {} by: {}", commentId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         return ResponseEntity.ok(commentService.updateComment(taskId, commentId, dto, authentication));
     }
 
@@ -54,7 +55,7 @@ public class CommentController {
                                               @PathVariable Long commentId,
                                               Authentication authentication) {
         logger.info("DELETE comment: {} on task: {} by: {}", commentId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         commentService.deleteComment(taskId, commentId, authentication);
         return ResponseEntity.noContent().build();
     }

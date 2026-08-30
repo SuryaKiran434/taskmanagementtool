@@ -32,7 +32,6 @@ import java.util.UUID;
 import java.util.List;
 
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
-import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @RestController
 @RequestMapping("/api/users")
@@ -206,7 +205,7 @@ public class UserController {
     @PostMapping("/me/avatar")
     public ResponseEntity<UserDTO> uploadAvatar(@RequestParam("file") MultipartFile file,
                                                  Authentication authentication) throws IOException {
-        logger.info("Uploading avatar for user: {}", sanitize(authentication.getName()));
+        logger.info("Uploading avatar for user: {}", maskEmail(authentication.getName()));
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             return ResponseEntity.badRequest().build();
@@ -222,7 +221,7 @@ public class UserController {
         Path target = avatarDir.resolve(filename).normalize();
         if (!target.startsWith(avatarDir)) {
             logger.warn("Rejected avatar upload resolving outside the avatar directory for user: {}",
-                    sanitize(authentication.getName()));
+                    maskEmail(authentication.getName()));
             return ResponseEntity.badRequest().build();
         }
 

@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
+
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
@@ -25,14 +27,14 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        logger.info("Loading user by email: {}", email);
+        logger.debug("Loading user by email: {}", maskEmail(email));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    logger.warn("User not found with email: {}", email);
-                    return new UsernameNotFoundException("User not found with email: " + email);
+                    logger.warn("User not found with email: {}", maskEmail(email));
+                    return new UsernameNotFoundException("User not found");
                 });
 
-        logger.info("User found with email: {}", email);
+        logger.debug("User loaded with id: {}", user.getId());
         return new CustomUserDetails(
                 user.getId(),
                 user.getEmail(),

@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @Service
@@ -82,7 +83,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(readOnly = true)
     public Page<TaskDTO> getAllTasks(Pageable pageable, Authentication authentication) {
-        logger.info("Retrieving all tasks for user: {}", sanitize(authentication.getName()));
+        logger.info("Retrieving all tasks for user: {}", maskEmail(authentication.getName()));
         if (!authentication.isAuthenticated()) {
             return getAllTasks(pageable);
         }
