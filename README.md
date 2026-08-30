@@ -185,7 +185,7 @@ src/
 │   └── resources/
 │       ├── application.properties   datasource, JPA, Hikari, CORS, uploads
 │       └── application.yml          profiles and ports, jwt.secret
-└── test/                            7 test classes, 47 tests (H2 in-memory)
+└── test/                           14 test classes, 123 tests (H2 in-memory)
 ```
 
 ## Run Locally
@@ -256,7 +256,7 @@ expects.
 ./mvnw test
 ```
 
-47 tests across 7 classes. They run against an in-memory H2 database in MySQL
+123 tests across 14 classes. They run against an in-memory H2 database in MySQL
 compatibility mode (`src/test/resources/application-test.properties`), so no
 MySQL instance and no environment variables are needed.
 
@@ -468,17 +468,24 @@ Worth fixing before anyone builds client behaviour on those status codes.
 ## Testing
 
 JUnit 5, Mockito, Spring Boot Test and `spring-security-test`, against H2 in
-MySQL mode. `./mvnw test` — **47 tests, 7 classes**:
+MySQL mode. `./mvnw test` — **123 tests, 14 classes**:
 
-| Class | Covers |
-| --- | --- |
-| `TaskServiceImplTest` | task service behaviour with mocked repositories |
-| `TaskQueryCountIntegrationTest` | query counts for the `@EntityGraph` and aggregate paths |
-| `RefactoringIntegrationTest` | Spring context wiring, `PerformanceMonitoringService`, `UserValidationService` |
-| `GlobalExceptionHandlerTest` | exception → status mapping |
-| `JwtUtilTest` | generation, username/role extraction, validation, refresh (parameterised) |
-| `CustomUserDetailsServiceTest` | user lookup and authority mapping |
-| `TaskmanagementtoolApplicationTests` | context loads |
+| Class | Tests | Covers |
+| --- | --- | --- |
+| `JwtUtilTest` | 20 | generation, username/role extraction, validation, refresh (parameterised) |
+| `EmailInLogsSweepTest` | 19 | every request-scoped path that logs a user, asserting no plaintext address reaches a record |
+| `EmailMaskingTest` | 17 | `maskEmail` across local-part lengths, missing `@`, and non-address input |
+| `ExceptionStatusCodeIntegrationTest` | 11 | exception → HTTP status end to end through the handler |
+| `TaskServiceImplTest` | 10 | task service behaviour with mocked repositories |
+| `TaskQueryCountIntegrationTest` | 10 | query counts for the `@EntityGraph` and aggregate paths |
+| `GlobalExceptionHandlerTest` | 9 | exception → status mapping |
+| `UserControllerSecurityTest` | 7 | that a non-admin cannot grant itself a role through a profile update |
+| `LogSanitizerTest` | 6 | CR/LF and control-character stripping, truncation |
+| `TokenBlacklistServiceTest` | 4 | revocation on logout, expiry eviction |
+| `RefactoringIntegrationTest` | 4 | Spring context wiring, `PerformanceMonitoringService`, `UserValidationService` |
+| `BearerOnlyAuthenticationTest` | 3 | that only `Authorization: Bearer` is accepted |
+| `CustomUserDetailsServiceTest` | 2 | user lookup and authority mapping |
+| `TaskmanagementtoolApplicationTests` | 1 | context loads |
 
 CI runs the same command on Java 17 (`.github/workflows/ci.yml`, job
 **Backend (Java 17)**), which is a required check on `main`. Dependency updates
