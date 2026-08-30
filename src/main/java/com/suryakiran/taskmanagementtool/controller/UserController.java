@@ -123,18 +123,29 @@ public class UserController {
         // the log cannot be read as an enumeration oracle: a registered and an unregistered
         // address produce the identical line, just as they produce the identical 200.
         logger.info("Forgot password request for email: {}", maskEmail(email));
+        // Both branches answer 200. A 404 for an unknown address would turn this
+        // endpoint into a membership oracle, so the status code is deliberately
+        // the same either way -- and the single exit point below keeps that
+        // property visible rather than buried in a catch block.
+        //
+        // NOTE: the status code is only half of it. The two bodies still differ
+        // -- one carries an OTP and its own wording, the other a null and
+        // different wording -- so the endpoint remains distinguishable to a
+        // caller, and returning the OTP at all means an unauthenticated caller
+        // can complete a reset. That is tracked separately; this change is not
+        // a fix for it and must not be read as one.
+        ResetTokenDTO body;
         try {
             // Verify user exists before generating OTP
             userService.getUserByEmail(email);
             String otp = passwordResetService.generateOtp(email);
-            ResetTokenDTO response = new ResetTokenDTO(email, otp,
+            body = new ResetTokenDTO(email, otp,
                     "OTP generated. Use it within 15 minutes to reset your password.");
-            return ResponseEntity.ok(response);
         } catch (UserNotFoundException e) {
-            // Return 200 to avoid user enumeration
-            return ResponseEntity.ok(new ResetTokenDTO(email, null,
-                    "If an account exists for this email, an OTP has been sent."));
+            body = new ResetTokenDTO(email, null,
+                    "If an account exists for this email, an OTP has been sent.");
         }
+        return ResponseEntity.ok(body);
     }
 
     /**
