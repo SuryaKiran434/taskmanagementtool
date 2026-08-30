@@ -5,7 +5,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.suryakiran.taskmanagementtool.controller.UserController;
 import com.suryakiran.taskmanagementtool.exception.GlobalExceptionHandler;
+import com.suryakiran.taskmanagementtool.dto.UserDTO;
 import com.suryakiran.taskmanagementtool.exception.UserNotFoundException;
+import com.suryakiran.taskmanagementtool.model.Role;
 import com.suryakiran.taskmanagementtool.model.User;
 import com.suryakiran.taskmanagementtool.repository.RoleRepository;
 import com.suryakiran.taskmanagementtool.repository.UserRepository;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -27,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -231,9 +235,37 @@ class EmailMaskingTest {
     }
 
     /**
+     * The two entry points that create an account. Neither has an id at the point it logs —
+     * nothing is persisted yet — so both mask.
+     */
+    @Test
+    void neitherAccountCreationEndpointWritesTheAddressToTheLog() throws Exception {
+        when(userService.registerUser(any(User.class))).thenReturn(new User());
+        when(userService.convertToDTO(any(User.class))).thenReturn(new UserDTO());
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Sam","lastName":"Jones","email":"sam.jones@gmail.com",
+                                 "password":"NewPassw0rd!","assignAdmin":false}"""))
+                .andExpect(status().isCreated());
+        assertThat(rendered()).containsExactly("Admin creating user with email: s***@gmail.com");
+
+        appender.list.clear();
+        mockMvc.perform(post("/api/users/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Sam","lastName":"Jones","email":"sam.jones@gmail.com",
+                                 "password":"NewPassw0rd!"}"""))
+                .andExpect(status().isOk());
+        assertThat(rendered()).containsExactly("Registering user with email: s***@gmail.com");
+    }
+
+    /**
      * The preferred remedy, at the layer where it applies: once the row has been loaded
-     * there is an id, and the id is what gets logged. No form of the address survives here,
-     * masked or otherwise.
+     * there is an id, and the id is what gets logged. No form of the address survives that
+     * line, masked or otherwise. The statement that runs before the lookup has no id to use
+     * and masks instead.
      */
     @Test
     void theServiceLayerLogsTheUserIdOnceTheUserIsLoaded() {
@@ -242,30 +274,85 @@ class EmailMaskingTest {
         user.setId(4242);
         user.setEmail(ADDRESS);
         when(userRepository.findByEmail(ADDRESS)).thenReturn(Optional.of(user));
-        UserServiceImpl service = new UserServiceImpl(userRepository, mock(RoleRepository.class),
-                mock(PasswordEncoder.class), mock(UserConversionService.class),
-                mock(UserValidationService.class));
+        UserServiceImpl service = newUserService(userRepository, mock(RoleRepository.class));
 
-        ch.qos.logback.classic.Logger serviceLogger =
-                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(UserServiceImpl.class);
-        ListAppender<ILoggingEvent> serviceAppender = new ListAppender<>();
-        serviceAppender.start();
-        serviceLogger.setLevel(Level.INFO);
-        serviceLogger.addAppender(serviceAppender);
-        try {
+        List<String> lines = capture(UserServiceImpl.class, () -> {
             service.getUserByEmail(ADDRESS);
             service.resetPassword(ADDRESS, "NewPassw0rd!");
-        } finally {
-            serviceLogger.detachAppender(serviceAppender);
-        }
+        });
 
-        List<String> lines = serviceAppender.list.stream()
-                .map(ILoggingEvent::getFormattedMessage).toList();
         assertThat(lines).contains("Fetched user with id: 4242")
-                .contains("Password reset successfully for user id: 4242");
+                .contains("Password reset successfully for user id: 4242")
+                .contains("Resetting password for user with email: s***@gmail.com");
         assertThat(lines).noneMatch(line -> line.contains(ADDRESS));
-        // The one line that has no id available yet is masked rather than dropped.
-        assertThat(lines).contains("Resetting password for user with email: s***@gmail.com");
+    }
+
+    /**
+     * Registration is the one service-layer statement with no id available: the row has not
+     * been inserted, so there is nothing to log but the address, masked.
+     */
+    @Test
+    void theServiceLayerMasksTheAddressBeforeTheUserIsPersisted() {
+        UserRepository userRepository = mock(UserRepository.class);
+        RoleRepository roleRepository = mock(RoleRepository.class);
+        when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(new Role()));
+        when(userRepository.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
+        UserServiceImpl service = newUserService(userRepository, roleRepository);
+        User user = new User();
+        user.setEmail(ADDRESS);
+        user.setPassword("NewPassw0rd!");
+
+        List<String> lines = capture(UserServiceImpl.class, () -> service.registerUser(user));
+
+        assertThat(lines).containsExactly("Creating user with email: s***@gmail.com");
+    }
+
+    /**
+     * {@link PasswordResetService} is the one place with no way to do better than mask: it
+     * holds the address and nothing else — no repository, so no id is reachable from it.
+     * Every one of its statements, on every branch, has to mask.
+     */
+    @Test
+    void everyOtpStatementMasksTheAddress() {
+        PasswordResetService service = new PasswordResetService();
+
+        List<String> lines = capture(PasswordResetService.class, () -> {
+            String otp = service.generateOtp(ADDRESS);
+            service.validateOtp("nobody@example.test", "000000");
+            service.validateOtp(ADDRESS, "000000");
+            service.validateOtp(ADDRESS, otp);
+        });
+
+        assertThat(lines).containsExactly(
+                "OTP generated for email: s***@gmail.com",
+                "OTP validation failed: no OTP found for email: n***@example.test",
+                "OTP validation failed: incorrect OTP for email: s***@gmail.com",
+                "OTP validated successfully for email: s***@gmail.com");
+        assertThat(lines).noneMatch(line -> line.contains(ADDRESS));
+    }
+
+    private static UserServiceImpl newUserService(UserRepository userRepository,
+                                                  RoleRepository roleRepository) {
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        return new UserServiceImpl(userRepository, roleRepository, passwordEncoder,
+                mock(UserConversionService.class), mock(UserValidationService.class));
+    }
+
+    /** Runs {@code body} with an appender attached to {@code type}'s logger. */
+    private static List<String> capture(Class<?> type, Runnable body) {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(type);
+        ListAppender<ILoggingEvent> captured = new ListAppender<>();
+        captured.start();
+        logger.setLevel(Level.INFO);
+        logger.addAppender(captured);
+        try {
+            body.run();
+        } finally {
+            logger.detachAppender(captured);
+        }
+        return captured.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     }
 
     private List<String> rendered() {
