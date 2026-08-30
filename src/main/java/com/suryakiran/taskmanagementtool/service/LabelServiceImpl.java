@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @Service
 public class LabelServiceImpl {
 
@@ -35,7 +37,7 @@ public class LabelServiceImpl {
     }
 
     public List<LabelDTO> getMyLabels(Authentication authentication) {
-        logger.debug("Fetching labels for user: {}", authentication.getName());
+        logger.debug("Fetching labels for user: {}", sanitize(authentication.getName()));
         User user = getUser(authentication.getName());
         return labelRepository.findByUser(user).stream().map(this::toDTO).toList();
     }
@@ -43,7 +45,7 @@ public class LabelServiceImpl {
     @Transactional
     public LabelDTO createLabel(LabelDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Creating label '{}' for user: {}", dto.getName(), user.getEmail());
+        logger.info("Creating label '{}' for user: {}", sanitize(dto.getName()), sanitize(user.getEmail()));
         if (labelRepository.existsByNameAndUser(dto.getName(), user)) {
             throw new IllegalArgumentException("Label with this name already exists");
         }
@@ -52,14 +54,14 @@ public class LabelServiceImpl {
         label.setColor(dto.getColor());
         label.setUser(user);
         LabelDTO created = toDTO(labelRepository.save(label));
-        logger.info("Label {} created for user: {}", created.getId(), user.getEmail());
+        logger.info("Label {} created for user: {}", created.getId(), sanitize(user.getEmail()));
         return created;
     }
 
     @Transactional
     public LabelDTO updateLabel(Long id, LabelDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Updating label: {} for user: {}", id, user.getEmail());
+        logger.info("Updating label: {} for user: {}", id, sanitize(user.getEmail()));
         Label label = labelRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
         label.setName(dto.getName());
@@ -70,7 +72,7 @@ public class LabelServiceImpl {
     @Transactional
     public void deleteLabel(Long id, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Deleting label: {} for user: {}", id, user.getEmail());
+        logger.info("Deleting label: {} for user: {}", id, sanitize(user.getEmail()));
         Label label = labelRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new ResourceNotFoundException("Label not found"));
         labelRepository.delete(label);
@@ -80,7 +82,8 @@ public class LabelServiceImpl {
     @Transactional
     public List<LabelDTO> addLabelToTask(String taskId, Long labelId, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Adding label: {} to task: {} by user: {}", labelId, taskId, user.getEmail());
+        logger.info("Adding label: {} to task: {} by user: {}", labelId, sanitize(taskId),
+                sanitize(user.getEmail()));
         Task task = taskRepository.findByIdAndUser(taskId, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         Label label = labelRepository.findByIdAndUser(labelId, user)
@@ -95,7 +98,8 @@ public class LabelServiceImpl {
     @Transactional
     public List<LabelDTO> removeLabelFromTask(String taskId, Long labelId, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Removing label: {} from task: {} by user: {}", labelId, taskId, user.getEmail());
+        logger.info("Removing label: {} from task: {} by user: {}", labelId, sanitize(taskId),
+                sanitize(user.getEmail()));
         Task task = taskRepository.findByIdAndUser(taskId, user)
                 .orElseThrow(() -> new TaskNotFoundException("Task not found"));
         Label label = labelRepository.findByIdAndUser(labelId, user)

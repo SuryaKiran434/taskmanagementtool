@@ -17,6 +17,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -57,7 +59,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserByEmail(String email) {
-        logger.info("Fetching user with email: {}", email);
+        logger.info("Fetching user with email: {}", sanitize(email));
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
     }
@@ -69,7 +71,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User registerUser(User user) {
-        logger.info("Creating user with email: {}", user.getEmail());
+        logger.info("Creating user with email: {}", sanitize(user.getEmail()));
         userValidationService.validateRequiredFields(user);
         userValidationService.validatePassword(user.getPassword());
 
@@ -151,12 +153,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void resetPassword(String email, String newPassword) {
-        logger.info("Resetting password for user with email: {}", email);
+        logger.info("Resetting password for user with email: {}", sanitize(email));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
         userValidationService.validatePassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        logger.info("Password reset successfully for email: {}", email);
+        logger.info("Password reset successfully for email: {}", sanitize(email));
     }
 }

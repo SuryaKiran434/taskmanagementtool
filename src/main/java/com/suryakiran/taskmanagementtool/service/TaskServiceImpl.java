@@ -23,6 +23,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @Service
 public class TaskServiceImpl implements TaskService {
 
@@ -50,7 +52,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public TaskDTO createTask(TaskDTO taskDTO, Authentication authentication) {
-        logger.info("Creating task with title: {}", taskDTO.getTitle());
+        logger.info("Creating task with title: {}", sanitize(taskDTO.getTitle()));
         if (!authentication.isAuthenticated()) {
             throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
         }
@@ -80,7 +82,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(readOnly = true)
     public Page<TaskDTO> getAllTasks(Pageable pageable, Authentication authentication) {
-        logger.info("Retrieving all tasks for user: {}", authentication.getName());
+        logger.info("Retrieving all tasks for user: {}", sanitize(authentication.getName()));
         if (!authentication.isAuthenticated()) {
             return getAllTasks(pageable);
         }
@@ -109,7 +111,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public TaskDTO updateTask(String id, TaskDTO taskDTO, Authentication authentication) {
-        logger.info("Updating task with ID: {}", id);
+        logger.info("Updating task with ID: {}", sanitize(id));
         if (!authentication.isAuthenticated()) {
             throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
         }
@@ -163,7 +165,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public void deleteTask(String id, Authentication authentication) {
-        logger.info("Soft-deleting task with ID: {}", id);
+        logger.info("Soft-deleting task with ID: {}", sanitize(id));
         if (!authentication.isAuthenticated()) {
             throw new AuthenticationRequiredException(AUTHENTICATION_REQUIRED);
         }
@@ -174,7 +176,7 @@ public class TaskServiceImpl implements TaskService {
         task.setDeletedAt(Instant.now());
         taskRepository.save(task);
         activityLogService.log(id, user, ActivityAction.TASK_DELETED, null, null, "Task soft-deleted");
-        logger.info("Task soft-deleted with ID: {}", id);
+        logger.info("Task soft-deleted with ID: {}", sanitize(id));
     }
 
     @Override
@@ -204,7 +206,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public TaskDTO restoreTask(String id, Authentication authentication) {
-        logger.info("Restoring task with ID: {}", id);
+        logger.info("Restoring task with ID: {}", sanitize(id));
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         Task task = taskRepository.findByIdAndUser(id, user)
@@ -212,7 +214,7 @@ public class TaskServiceImpl implements TaskService {
         task.setDeletedAt(null);
         Task restoredTask = taskRepository.save(task);
         activityLogService.log(id, user, ActivityAction.TASK_RESTORED, null, null, "Task restored");
-        logger.info("Task restored with ID: {}", id);
+        logger.info("Task restored with ID: {}", sanitize(id));
         return taskConversionService.convertToDTO(restoredTask);
     }
 

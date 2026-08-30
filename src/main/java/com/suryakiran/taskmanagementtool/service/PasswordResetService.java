@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 /**
  * Manages OTP-based password reset tokens.
  * Each OTP is a 6-digit code valid for 15 minutes.
@@ -35,7 +37,7 @@ public class PasswordResetService {
         String otp = String.format("%0" + OTP_LENGTH + "d",
                 secureRandom.nextInt((int) Math.pow(10, OTP_LENGTH)));
         otpStore.put(email.toLowerCase(), new OtpEntry(otp, Instant.now().plusSeconds(OTP_TTL_SECONDS)));
-        logger.info("OTP generated for email: {}", email);
+        logger.info("OTP generated for email: {}", sanitize(email));
         return otp;
     }
 
@@ -48,20 +50,20 @@ public class PasswordResetService {
         pruneExpired();
         OtpEntry entry = otpStore.get(email.toLowerCase());
         if (entry == null) {
-            logger.warn("OTP validation failed: no OTP found for email: {}", email);
+            logger.warn("OTP validation failed: no OTP found for email: {}", sanitize(email));
             return false;
         }
         if (Instant.now().isAfter(entry.expiry())) {
             otpStore.remove(email.toLowerCase());
-            logger.warn("OTP validation failed: OTP expired for email: {}", email);
+            logger.warn("OTP validation failed: OTP expired for email: {}", sanitize(email));
             return false;
         }
         if (!entry.otp().equals(otp)) {
-            logger.warn("OTP validation failed: incorrect OTP for email: {}", email);
+            logger.warn("OTP validation failed: incorrect OTP for email: {}", sanitize(email));
             return false;
         }
         otpStore.remove(email.toLowerCase()); // one-time use
-        logger.info("OTP validated successfully for email: {}", email);
+        logger.info("OTP validated successfully for email: {}", sanitize(email));
         return true;
     }
 

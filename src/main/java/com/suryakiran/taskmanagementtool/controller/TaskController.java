@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
@@ -50,7 +52,7 @@ public class TaskController {
 
     @PostMapping
     public ResponseEntity<TaskDTO> createTask(@Valid @RequestBody TaskDTO taskDTO, Authentication authentication) {
-        logger.info("Creating task: {}", taskDTO.getTitle());
+        logger.info("Creating task: {}", sanitize(taskDTO.getTitle()));
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).build();
         }

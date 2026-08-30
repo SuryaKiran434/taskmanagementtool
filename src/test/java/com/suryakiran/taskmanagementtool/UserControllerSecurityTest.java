@@ -9,6 +9,8 @@ import com.suryakiran.taskmanagementtool.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,16 +27,20 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Security regressions for {@link UserController}, covering two CodeQL findings.
+ * Security regressions for {@link UserController}, covering two CodeQL findings and one
+ * SonarCloud finding.
  *
  * <p><strong>java/path-injection</strong> — {@code POST /api/users/me/avatar} built the
  * stored filename as {@code UUID + originalFilename.substring(lastIndexOf('.'))}, so the
@@ -50,6 +56,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * into the response body. That catch is broad enough to pick up failures from deeper
  * layers, whose messages carry internal detail. The detail is now logged and the client
  * gets a fixed string.</p>
+ *
+ * <p><strong>java:S4684</strong> — {@code PUT /api/users/{id}} bound the {@code User} JPA
+ * entity straight from the request body, so a caller could set fields the endpoint never
+ * meant to expose — {@code roles} above all, which {@code updateUser} copies onto the
+ * persisted user. The body now binds to {@code UserUpdateDTO} and is mapped across field by
+ * field.</p>
  */
 class UserControllerSecurityTest {
 
@@ -230,6 +242,51 @@ class UserControllerSecurityTest {
                         .param("newPassword", "NewPassw0rd!"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Invalid or expired OTP. Please request a new one."));
+    }
+
+    // --- java:S4684 (mass assignment) ---
+
+    /**
+     * {@code PUT /api/users/{id}} used to bind the {@code User} entity itself, and
+     * {@code UserServiceImpl.updateUser} copies a non-empty {@code roles} collection onto the
+     * persisted user. Since the endpoint is reachable by a non-admin editing their own
+     * profile, that was a self-service route to ROLE_ADMIN. The body now binds to
+     * {@code UserUpdateDTO}, which has nowhere to put {@code roles}, {@code id},
+     * {@code createdAt} or {@code tasks} -- the request below carries all four and none of
+     * them reaches the object handed to the service.
+     */
+    @Test
+    void updateUserIgnoresFieldsTheEndpointDoesNotAccept() throws Exception {
+        String body = """
+                {
+                  "firstName": "Ada",
+                  "lastName": "Lovelace",
+                  "email": "ada@example.com",
+                  "id": 99,
+                  "roles": [{"id": 1, "name": "ROLE_ADMIN"}],
+                  "createdAt": "01-01-1970",
+                  "tasks": []
+                }""";
+
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .principal(authentication))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userService).updateUser(eq(1), captor.capture());
+        User applied = captor.getValue();
+
+        // The escalation vector: null means updateUser leaves the stored roles untouched.
+        assertThat(applied.getRoles()).isNull();
+        assertThat(applied.getId()).isZero();
+        assertThat(applied.getCreatedAt()).isNull();
+        assertThat(applied.getTasks()).isNull();
+        // The fields the endpoint does accept still come through.
+        assertThat(applied.getFirstName()).isEqualTo("Ada");
+        assertThat(applied.getLastName()).isEqualTo("Lovelace");
+        assertThat(applied.getEmail()).isEqualTo("ada@example.com");
     }
 
     /**
