@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @RestController
@@ -86,7 +87,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<UserDTO> createUser(@Valid @RequestBody AdminCreateUserDTO dto) {
-        logger.info("Admin creating user with email: {}", sanitize(dto.getEmail()));
+        logger.info("Admin creating user with email: {}", maskEmail(dto.getEmail()));
         User user = new User();
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
@@ -101,7 +102,7 @@ public class UserController {
 
     @PostMapping("/register")
     public User registerUser(@Valid @RequestBody UserRegistrationDTO userRegistrationDTO) {
-        logger.info("Registering user with email: {}", sanitize(userRegistrationDTO.getEmail()));
+        logger.info("Registering user with email: {}", maskEmail(userRegistrationDTO.getEmail()));
         if (!PasswordValidator.validatePassword(userRegistrationDTO.getPassword())) {
             throw new IllegalArgumentException("Password does not meet complexity requirements");
         }
@@ -119,7 +120,10 @@ public class UserController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<ResetTokenDTO> forgotPassword(@RequestParam String email) {
-        logger.info("Forgot password request for email: {}", sanitize(email));
+        // Emitted before the branch, with wording that does not depend on the outcome, so
+        // the log cannot be read as an enumeration oracle: a registered and an unregistered
+        // address produce the identical line, just as they produce the identical 200.
+        logger.info("Forgot password request for email: {}", maskEmail(email));
         try {
             // Verify user exists before generating OTP
             userService.getUserByEmail(email);
@@ -142,7 +146,7 @@ public class UserController {
             @RequestParam String email,
             @RequestParam String token,
             @RequestParam String newPassword) {
-        logger.info("Password reset attempt for email: {}", sanitize(email));
+        logger.info("Password reset attempt for email: {}", maskEmail(email));
 
         if (!passwordResetService.validateOtp(email, token)) {
             return ResponseEntity.status(400).body("Invalid or expired OTP. Please request a new one.");
@@ -156,7 +160,7 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             // Log the specific reason server-side; the client gets a fixed message so that
             // internal detail carried on the exception never reaches the response body.
-            logger.error("Password reset rejected for email {}: {}", sanitize(email), e.getMessage(), e);
+            logger.error("Password reset rejected for email {}: {}", maskEmail(email), e.getMessage(), e);
             return ResponseEntity.badRequest().body("Password does not meet complexity requirements.");
         }
     }

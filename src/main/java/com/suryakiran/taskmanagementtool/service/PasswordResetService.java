@@ -10,12 +10,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 
 /**
  * Manages OTP-based password reset tokens.
  * Each OTP is a 6-digit code valid for 15 minutes.
  * Expired entries are pruned on every access.
+ *
+ * <p>The address is the only handle this service has on a user — there is no repository
+ * here and so no id to log instead — so every statement below masks it. The store is still
+ * keyed on the full address; only what reaches the log is reduced.</p>
  */
 @Service
 public class PasswordResetService {
@@ -42,7 +46,7 @@ public class PasswordResetService {
         String otp = String.format("%0" + OTP_LENGTH + "d",
                 secureRandom.nextInt((int) Math.pow(10, OTP_LENGTH)));
         otpStore.put(email.toLowerCase(), new OtpEntry(otp, Instant.now().plusSeconds(OTP_TTL_SECONDS)));
-        logger.info("OTP generated for email: {}", sanitize(email));
+        logger.info("OTP generated for email: {}", maskEmail(email));
         return otp;
     }
 
@@ -56,20 +60,20 @@ public class PasswordResetService {
         pruneExpired();
         OtpEntry entry = otpStore.get(email.toLowerCase());
         if (entry == null) {
-            logger.warn("OTP validation failed: no OTP found for email: {}", sanitize(email));
+            logger.warn("OTP validation failed: no OTP found for email: {}", maskEmail(email));
             return false;
         }
         if (Instant.now().isAfter(entry.expiry())) {
             otpStore.remove(email.toLowerCase());
-            logger.warn("OTP validation failed: OTP expired for email: {}", sanitize(email));
+            logger.warn("OTP validation failed: OTP expired for email: {}", maskEmail(email));
             return false;
         }
         if (!entry.otp().equals(otp)) {
-            logger.warn("OTP validation failed: incorrect OTP for email: {}", sanitize(email));
+            logger.warn("OTP validation failed: incorrect OTP for email: {}", maskEmail(email));
             return false;
         }
         otpStore.remove(email.toLowerCase()); // one-time use
-        logger.info("OTP validated successfully for email: {}", sanitize(email));
+        logger.info("OTP validated successfully for email: {}", maskEmail(email));
         return true;
     }
 

@@ -24,6 +24,13 @@ import java.util.Objects;
  * <p><strong>Where to apply it.</strong> Only to values a request can influence: titles,
  * names, comment bodies, email addresses, string path variables. Wrapping a generated id,
  * an enum, a count or a boolean adds noise without adding safety.</p>
+ *
+ * <p><strong>Email addresses need more than this.</strong> {@link #sanitize} makes a value
+ * safe to write; it does not make it appropriate to write. An email address is personal
+ * data, and logs are copied, shipped to a search index and retained far longer than the
+ * record they describe. Prefer logging the user's id where a persisted user is in hand;
+ * where there is no id yet — a registration before the insert, a forgotten-password request
+ * for an address that may not resolve — use {@link #maskEmail} instead.</p>
  */
 public final class LogSanitizer {
 
@@ -38,6 +45,12 @@ public final class LogSanitizer {
 
     /** Appended to a value that was cut short, so a truncated log line is obvious as such. */
     public static final String TRUNCATION_MARKER = "...[truncated]";
+
+    /** Logged in place of an empty or whitespace-only value, which {@code ""} would hide. */
+    static final String BLANK_PLACEHOLDER = "<blank>";
+
+    /** Stands in for the part of an address deliberately withheld from the log. */
+    static final String MASK = "***";
 
     /**
      * ASCII control characters (which covers CR, LF, tab, NUL and ESC) plus the three
@@ -66,5 +79,52 @@ public final class LogSanitizer {
             text = text.substring(0, MAX_LENGTH) + TRUNCATION_MARKER;
         }
         return text.replaceAll(CONTROL_CHARACTERS, REPLACEMENT);
+    }
+
+    /**
+     * Returns a masked, single-line rendering of an email address: the first character of
+     * the local part, then {@value #MASK}, then the domain in full — {@code sam@gmail.com}
+     * becomes {@code s***@gmail.com}.
+     *
+     * <p><strong>Why mask rather than drop.</strong> These log lines are read for two
+     * things: noticing that the <em>same</em> address is retrying over and over, and seeing
+     * which provider or corporate domain is involved. The mask keeps both — repeats still
+     * collide, the domain is still there — while the identity behind the address does not
+     * reach the log.</p>
+     *
+     * <p><strong>Why not a hash.</strong> A hash of an address is stable and the input space
+     * is small enough to enumerate, so it remains a pseudonymous identifier rather than an
+     * anonymous one; and it throws away the domain, which is the part an operator actually
+     * uses. It costs the debuggability without buying the privacy.</p>
+     *
+     * <p>The value is put through {@link #sanitize} first, so masking is applied
+     * <em>in addition</em> to control-character stripping and truncation, never instead of
+     * it — an address is still attacker-controlled input. A value with no {@code @} is not
+     * an address this method can reason about and is withheld entirely; {@code null} and
+     * blank values render as placeholders rather than throwing.</p>
+     *
+     * @param value the untrusted address; may be {@code null}
+     * @return the masked text, never {@code null} and never containing a line break
+     */
+    public static String maskEmail(Object value) {
+        // sanitize() rather than a null branch of our own, for the reason given above:
+        // testing this method's own argument against null is a fact the analyser carries
+        // back to every call site.
+        String text = sanitize(value).trim();
+        if (NULL_PLACEHOLDER.equals(text)) {
+            return NULL_PLACEHOLDER;
+        }
+        if (text.isEmpty()) {
+            return BLANK_PLACEHOLDER;
+        }
+        // lastIndexOf: a quoted local part may legally contain '@', and the domain is
+        // whatever follows the final one.
+        int at = text.lastIndexOf('@');
+        if (at < 0) {
+            return MASK;
+        }
+        // min(1, at) keeps the first character when there is one, and keeps nothing for an
+        // address that begins with '@', without a second branch.
+        return text.substring(0, Math.min(1, at)) + MASK + text.substring(at);
     }
 }
