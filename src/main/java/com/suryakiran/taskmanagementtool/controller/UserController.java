@@ -40,6 +40,14 @@ public class UserController {
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
 
     /**
+     * The one answer POST /forgot-password gives, whether or not the address has an
+     * account. Held as a constant so the two paths cannot drift into two wordings
+     * again -- that difference was itself the enumeration oracle.
+     */
+    private static final String RESET_REQUESTED_MESSAGE =
+            "If an account exists for this email, a reset code has been sent.";
+
+    /**
      * Extensions an avatar may be stored under. The value written into the filename is
      * always one of these constants, never a substring of the client-supplied name, so
      * nothing the client controls can reach the filesystem path.
@@ -48,11 +56,38 @@ public class UserController {
             List.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
     private static final String DEFAULT_AVATAR_EXTENSION = ".jpg";
 
+    /**
+     * Whether POST /forgot-password may return the OTP in its response body.
+     *
+     * <p>Defaults to false and is switched on only by the dev profile. With no email
+     * delivery implemented, returning the OTP was the only way to complete a reset --
+     * but the endpoint is permitAll, so anyone who could name an address could read
+     * its OTP and hand it straight back to /reset-password, which is also permitAll.
+     * That is an unauthenticated takeover of any account whose address is known, not
+     * a convenience. Until a mailer exists, the reset flow is deliberately
+     * non-functional outside dev rather than open to everyone.</p>
+     */
+    @Value("${app.password-reset.expose-otp:false}")
+    private boolean exposeOtp;
+
     @Value("${app.upload.dir}")
     private String uploadDir;
 
     private final UserService userService;
     private final PasswordResetService passwordResetService;
+
+    /**
+     * Says so, loudly, when the OTP echo is on. A setting that turns an endpoint into
+     * an account-takeover path should not be something you discover by reading YAML.
+     */
+    @jakarta.annotation.PostConstruct
+    void warnIfOtpExposed() {
+        if (exposeOtp) {
+            logger.warn("app.password-reset.expose-otp is ON: /forgot-password will return "
+                    + "the OTP in its response body. This is for local development only -- "
+                    + "with it on, anyone who can name an address can reset that account.");
+        }
+    }
 
     public UserController(UserService userService, PasswordResetService passwordResetService) {
         this.userService = userService;
@@ -115,7 +150,10 @@ public class UserController {
 
     /**
      * Step 1 of password reset: request an OTP.
-     * Returns the OTP in the response body (until email delivery is implemented).
+     *
+     * <p>Answers 200 with the same body for every address, registered or not. The OTP
+     * is returned only when {@code app.password-reset.expose-otp} is on, which the dev
+     * profile sets and nothing else does.</p>
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<ResetTokenDTO> forgotPassword(@RequestParam String email) {
@@ -123,29 +161,25 @@ public class UserController {
         // the log cannot be read as an enumeration oracle: a registered and an unregistered
         // address produce the identical line, just as they produce the identical 200.
         logger.info("Forgot password request for email: {}", maskEmail(email));
-        // Both branches answer 200. A 404 for an unknown address would turn this
-        // endpoint into a membership oracle, so the status code is deliberately
-        // the same either way -- and the single exit point below keeps that
-        // property visible rather than buried in a catch block.
-        //
-        // NOTE: the status code is only half of it. The two bodies still differ
-        // -- one carries an OTP and its own wording, the other a null and
-        // different wording -- so the endpoint remains distinguishable to a
-        // caller, and returning the OTP at all means an unauthenticated caller
-        // can complete a reset. That is tracked separately; this change is not
-        // a fix for it and must not be read as one.
-        ResetTokenDTO body;
+        // Same status and same wording whichever branch runs, so the response says
+        // nothing about whether the address is registered. Equal status codes alone
+        // were not enough: the two bodies used to differ in both the otp field and
+        // the message, which is all a caller needs to enumerate accounts.
+        String otp = null;
         try {
             // Verify user exists before generating OTP
             userService.getUserByEmail(email);
-            String otp = passwordResetService.generateOtp(email);
-            body = new ResetTokenDTO(email, otp,
-                    "OTP generated. Use it within 15 minutes to reset your password.");
+            String generated = passwordResetService.generateOtp(email);
+            // The OTP leaves the server only where a developer has explicitly asked
+            // for it. Everywhere else it is generated, stored, and never returned.
+            if (exposeOtp) {
+                otp = generated;
+            }
         } catch (UserNotFoundException e) {
-            body = new ResetTokenDTO(email, null,
-                    "If an account exists for this email, an OTP has been sent.");
+            logger.info("Password reset requested for an address with no account: {}",
+                    maskEmail(email));
         }
-        return ResponseEntity.ok(body);
+        return ResponseEntity.ok(new ResetTokenDTO(email, otp, RESET_REQUESTED_MESSAGE));
     }
 
     /**
