@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
+
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationController {
@@ -24,13 +26,13 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<List<NotificationDTO>> getAllNotifications(Authentication authentication) {
-        logger.debug("GET all notifications for: {}", authentication.getName());
+        logger.debug("GET all notifications for: {}", maskEmail(authentication.getName()));
         return ResponseEntity.ok(notificationService.getAllNotifications(authentication));
     }
 
     @GetMapping("/unread")
     public ResponseEntity<List<NotificationDTO>> getUnread(Authentication authentication) {
-        logger.debug("GET unread notifications for: {}", authentication.getName());
+        logger.debug("GET unread notifications for: {}", maskEmail(authentication.getName()));
         return ResponseEntity.ok(notificationService.getUnreadNotifications(authentication));
     }
 
@@ -41,14 +43,14 @@ public class NotificationController {
 
     @PutMapping("/{id}/read")
     public ResponseEntity<Void> markRead(@PathVariable Long id, Authentication authentication) {
-        logger.info("Mark notification {} as read for: {}", id, authentication.getName());
+        logger.info("Mark notification {} as read for: {}", id, maskEmail(authentication.getName()));
         notificationService.markAsRead(id, authentication);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/read-all")
     public ResponseEntity<Void> markAllRead(Authentication authentication) {
-        logger.info("Mark all notifications read for: {}", authentication.getName());
+        logger.info("Mark all notifications read for: {}", maskEmail(authentication.getName()));
         notificationService.markAllAsRead(authentication);
         return ResponseEntity.noContent().build();
     }

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @Service
@@ -38,7 +39,7 @@ public class SubtaskServiceImpl {
 
     public List<SubtaskDTO> getSubtasks(String taskId, Authentication authentication) {
         logger.debug("Fetching subtasks for task: {} by user: {}", sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         Task task = getTaskForUser(taskId, authentication);
         return subtaskRepository.findByTaskOrderByPositionAsc(task).stream().map(this::toDTO).toList();
     }
@@ -46,8 +47,8 @@ public class SubtaskServiceImpl {
     @Transactional
     public SubtaskDTO createSubtask(String taskId, SubtaskDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Creating subtask '{}' on task: {} by user: {}", sanitize(dto.getTitle()),
-                sanitize(taskId), sanitize(user.getEmail()));
+        logger.info("Creating subtask '{}' on task: {} by user id: {}", sanitize(dto.getTitle()),
+                sanitize(taskId), user.getId());
         Task task = getTaskForUser(taskId, authentication);
         Subtask subtask = new Subtask();
         subtask.setTask(task);
@@ -64,8 +65,8 @@ public class SubtaskServiceImpl {
     @Transactional
     public SubtaskDTO updateSubtask(String taskId, Long subtaskId, SubtaskDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Updating subtask: {} on task: {} by user: {}", subtaskId, sanitize(taskId),
-                sanitize(user.getEmail()));
+        logger.info("Updating subtask: {} on task: {} by user id: {}", subtaskId, sanitize(taskId),
+                user.getId());
         Task task = getTaskForUser(taskId, authentication);
         Subtask subtask = subtaskRepository.findByIdAndTask(subtaskId, task)
                 .orElseThrow(() -> new ResourceNotFoundException("Subtask not found"));
@@ -87,7 +88,7 @@ public class SubtaskServiceImpl {
     @Transactional
     public void deleteSubtask(String taskId, Long subtaskId, Authentication authentication) {
         logger.info("Deleting subtask: {} from task: {} by user: {}", subtaskId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         Task task = getTaskForUser(taskId, authentication);
         Subtask subtask = subtaskRepository.findByIdAndTask(subtaskId, task)
                 .orElseThrow(() -> new ResourceNotFoundException("Subtask not found"));

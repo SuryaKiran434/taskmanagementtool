@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @RestController
@@ -35,7 +36,7 @@ public class SubtaskController {
     public ResponseEntity<SubtaskDTO> createSubtask(@PathVariable String taskId,
                                                      @Valid @RequestBody SubtaskDTO dto,
                                                      Authentication authentication) {
-        logger.info("POST subtask on task: {} by: {}", sanitize(taskId), sanitize(authentication.getName()));
+        logger.info("POST subtask on task: {} by: {}", sanitize(taskId), maskEmail(authentication.getName()));
         return ResponseEntity.ok(subtaskService.createSubtask(taskId, dto, authentication));
     }
 
@@ -45,7 +46,7 @@ public class SubtaskController {
                                                     @Valid @RequestBody SubtaskDTO dto,
                                                     Authentication authentication) {
         logger.info("PUT subtask: {} on task: {} by: {}", subtaskId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         return ResponseEntity.ok(subtaskService.updateSubtask(taskId, subtaskId, dto, authentication));
     }
 
@@ -54,7 +55,7 @@ public class SubtaskController {
                                               @PathVariable Long subtaskId,
                                               Authentication authentication) {
         logger.info("DELETE subtask: {} from task: {} by: {}", subtaskId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         subtaskService.deleteSubtask(taskId, subtaskId, authentication);
         return ResponseEntity.noContent().build();
     }

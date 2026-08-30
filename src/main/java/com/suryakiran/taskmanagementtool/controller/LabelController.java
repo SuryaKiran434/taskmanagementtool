@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @RestController
@@ -26,14 +27,14 @@ public class LabelController {
 
     @GetMapping
     public ResponseEntity<List<LabelDTO>> getMyLabels(Authentication authentication) {
-        logger.debug("GET labels for user: {}", sanitize(authentication.getName()));
+        logger.debug("GET labels for user: {}", maskEmail(authentication.getName()));
         return ResponseEntity.ok(labelService.getMyLabels(authentication));
     }
 
     @PostMapping
     public ResponseEntity<LabelDTO> createLabel(@Valid @RequestBody LabelDTO dto,
                                                  Authentication authentication) {
-        logger.info("POST label '{}' by: {}", sanitize(dto.getName()), sanitize(authentication.getName()));
+        logger.info("POST label '{}' by: {}", sanitize(dto.getName()), maskEmail(authentication.getName()));
         return ResponseEntity.ok(labelService.createLabel(dto, authentication));
     }
 
@@ -41,13 +42,13 @@ public class LabelController {
     public ResponseEntity<LabelDTO> updateLabel(@PathVariable Long id,
                                                 @Valid @RequestBody LabelDTO dto,
                                                 Authentication authentication) {
-        logger.info("PUT label: {} by: {}", id, sanitize(authentication.getName()));
+        logger.info("PUT label: {} by: {}", id, maskEmail(authentication.getName()));
         return ResponseEntity.ok(labelService.updateLabel(id, dto, authentication));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLabel(@PathVariable Long id, Authentication authentication) {
-        logger.info("DELETE label: {} by: {}", id, sanitize(authentication.getName()));
+        logger.info("DELETE label: {} by: {}", id, maskEmail(authentication.getName()));
         labelService.deleteLabel(id, authentication);
         return ResponseEntity.noContent().build();
     }
@@ -57,7 +58,7 @@ public class LabelController {
                                                     @PathVariable Long labelId,
                                                     Authentication authentication) {
         logger.info("Add label {} to task: {} by: {}", labelId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         return ResponseEntity.ok(labelService.addLabelToTask(taskId, labelId, authentication));
     }
 
@@ -66,7 +67,7 @@ public class LabelController {
                                                          @PathVariable Long labelId,
                                                          Authentication authentication) {
         logger.info("Remove label {} from task: {} by: {}", labelId, sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         return ResponseEntity.ok(labelService.removeLabelFromTask(taskId, labelId, authentication));
     }
 }

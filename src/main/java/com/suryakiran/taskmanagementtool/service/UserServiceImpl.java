@@ -24,6 +24,14 @@ public class UserServiceImpl implements UserService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
+    /**
+     * Deliberately carries no address. This message is written to the log by
+     * {@code GlobalExceptionHandler} and returned in the response body, so interpolating the
+     * address here would put it back in plaintext one frame after the statements above took
+     * the trouble to mask it -- and hand it to the caller as well.
+     */
+    private static final String USER_NOT_FOUND = "User not found";
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -63,7 +71,7 @@ public class UserServiceImpl implements UserService {
         // stable, non-personal identifier to name the user by, which correlates across log
         // lines better than the address ever did and keeps the address out of the log.
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         logger.info("Fetched user with id: {}", user.getId());
         return user;
     }
@@ -148,7 +156,7 @@ public class UserServiceImpl implements UserService {
     public User assignRoleToUser(Long userId, String roleName) {
         logger.info("Assigning role {} to user with id: {}", roleName, userId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException(USER_NOT_FOUND));
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
         user.getRoles().add(role);
@@ -159,7 +167,7 @@ public class UserServiceImpl implements UserService {
     public void resetPassword(String email, String newPassword) {
         logger.info("Resetting password for user with email: {}", maskEmail(email));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new UserNotFoundException(USER_NOT_FOUND));
         userValidationService.validatePassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);

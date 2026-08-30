@@ -20,6 +20,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
+
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
 
@@ -47,7 +49,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             jwt = authorizationHeader.substring(7);
             try {
                 username = jwtUtil.extractUsername(jwt);
-                logger.debug("JWT token present for user: {}", username);
+                logger.debug("JWT token present for user: {}", maskEmail(username));
             } catch (Exception e) {
                 // Log the reason but never the token value itself
                 logger.warn("Invalid JWT token on {} {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
@@ -70,14 +72,14 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                             new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    logger.debug("Authenticated user: {} with roles: {}", username, roles);
+                    logger.debug("Authenticated user: {} with roles: {}", maskEmail(username), roles);
                 } else {
-                    logger.warn("Valid token but no roles found for user: {}", username);
+                    logger.warn("Valid token but no roles found for user: {}", maskEmail(username));
                 }
             } else {
                 // Token present but invalid — warn without revealing the token
                 logger.warn("Token validation failed for user: {} on {} {}",
-                        username, request.getMethod(), request.getRequestURI());
+                        maskEmail(username), request.getMethod(), request.getRequestURI());
             }
         }
 

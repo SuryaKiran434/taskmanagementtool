@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.suryakiran.taskmanagementtool.util.LogSanitizer.maskEmail;
 import static com.suryakiran.taskmanagementtool.util.LogSanitizer.sanitize;
 
 @Service
@@ -38,7 +39,7 @@ public class CommentServiceImpl {
 
     public List<CommentDTO> getComments(String taskId, Authentication authentication) {
         logger.debug("Fetching comments for task: {} by user: {}", sanitize(taskId),
-                sanitize(authentication.getName()));
+                maskEmail(authentication.getName()));
         Task task = getTaskForUser(taskId, authentication);
         return commentRepository.findByTaskOrderByCreatedAtDesc(task).stream().map(this::toDTO).toList();
     }
@@ -46,7 +47,7 @@ public class CommentServiceImpl {
     @Transactional
     public CommentDTO addComment(String taskId, CommentDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Adding comment to task: {} by user: {}", sanitize(taskId), sanitize(user.getEmail()));
+        logger.info("Adding comment to task: {} by user id: {}", sanitize(taskId), user.getId());
         Task task = getTaskForUser(taskId, authentication);
         Comment comment = new Comment();
         comment.setTask(task);
@@ -61,8 +62,8 @@ public class CommentServiceImpl {
     @Transactional
     public CommentDTO updateComment(String taskId, Long commentId, CommentDTO dto, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Updating comment: {} on task: {} by user: {}", commentId, sanitize(taskId),
-                sanitize(user.getEmail()));
+        logger.info("Updating comment: {} on task: {} by user id: {}", commentId, sanitize(taskId),
+                user.getId());
         Task task = getTaskForUser(taskId, authentication);
         Comment comment = commentRepository.findByIdAndTask(commentId, task)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
@@ -80,8 +81,8 @@ public class CommentServiceImpl {
     @Transactional
     public void deleteComment(String taskId, Long commentId, Authentication authentication) {
         User user = getUser(authentication.getName());
-        logger.info("Deleting comment: {} on task: {} by user: {}", commentId, sanitize(taskId),
-                sanitize(user.getEmail()));
+        logger.info("Deleting comment: {} on task: {} by user id: {}", commentId, sanitize(taskId),
+                user.getId());
         Task task = getTaskForUser(taskId, authentication);
         Comment comment = commentRepository.findByIdAndTask(commentId, task)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));

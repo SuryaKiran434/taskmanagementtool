@@ -55,7 +55,7 @@ public class TaskExportService {
                 });
             }
         }
-        logger.info("Exported {} tasks to CSV for user: {}", tasks.size(), user.getEmail());
+        logger.info("Exported {} tasks to CSV for user id: {}", tasks.size(), user.getId());
         return out.toByteArray();
     }
 }
