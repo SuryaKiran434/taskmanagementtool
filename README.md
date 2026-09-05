@@ -1,6 +1,6 @@
 # Task Management Tool — Backend
 
-Spring Boot 3.3.4 REST API (Java 17, Maven, MySQL 8) behind JWT authentication.
+Spring Boot 3.5.16 REST API (Java 17, Maven, MySQL 8) behind JWT authentication.
 It backs the [task-management-frontend](https://github.com/SuryaKiran434/task-management-frontend)
 React client, and covers tasks, projects and project membership, comments,
 labels, subtasks, notifications, and a per-task activity log.
@@ -12,10 +12,11 @@ labels, subtasks, notifications, and a per-task activity log.
 3. [Run Locally](#run-locally)
 4. [Configuration](#configuration)
 5. [API Reference](#api-reference)
-6. [Security](#security)
-7. [Data Access and Performance](#data-access-and-performance)
-8. [Error Handling](#error-handling)
-9. [Testing](#testing)
+6. [Password Reset](#password-reset)
+7. [Security](#security)
+8. [Data Access and Performance](#data-access-and-performance)
+9. [Error Handling](#error-handling)
+10. [Testing](#testing)
 
 ## Features
 
@@ -33,6 +34,8 @@ labels, subtasks, notifications, and a per-task activity log.
   (14 `ActivityAction` kinds, from `TASK_CREATED` to `LABEL_REMOVED`).
 - **Auth and users** — registration, JWT login, refresh, logout via a token
   blacklist, forgot/reset password, avatar upload, and admin role assignment.
+  **The password reset is not completable outside the `dev` profile** — see
+  [Password reset](#password-reset).
 - **Rate limiting** — Bucket4j token bucket in front of the auth endpoints.
 - **OpenAPI** — springdoc-generated docs and a Swagger UI.
 
@@ -181,11 +184,12 @@ src/
 │   │   ├── repository/   Spring Data JPA repositories
 │   │   ├── security/     CustomUserDetails
 │   │   ├── service/      business logic, conversion, scheduling
-│   │   └── util/         JwtUtil, PasswordValidator, UniqueIdGenerator
+│   │   └── util/         JwtUtil, LogSanitizer, PasswordValidator,
+│                     UniqueIdGenerator
 │   └── resources/
 │       ├── application.properties   datasource, JPA, Hikari, CORS, uploads
 │       └── application.yml          profiles and ports, jwt.secret
-└── test/                           14 test classes, 123 tests (H2 in-memory)
+└── test/                           15 test classes, 132 tests (H2 in-memory)
 ```
 
 ## Run Locally
@@ -243,8 +247,9 @@ configuration prefers.
 
 The `dev` profile is active by default (`spring.profiles.active: dev` in
 `application.yml`), so the API listens on **http://localhost:8081**. That is the
-port the frontend's `REACT_APP_API_BASE_URL` default (`http://localhost:8081/api`)
-expects.
+port the frontend's `VITE_API_BASE_URL` default (`http://localhost:8081/api`)
+expects. (That variable was `REACT_APP_API_BASE_URL` until the frontend moved
+off create-react-app to Vite.)
 
 - API base: `http://localhost:8081/api`
 - Swagger UI: **http://localhost:8081/swagger-ui.html**
@@ -256,7 +261,7 @@ expects.
 ./mvnw test
 ```
 
-123 tests across 14 classes. They run against an in-memory H2 database in MySQL
+132 tests across 15 classes. They run against an in-memory H2 database in MySQL
 compatibility mode (`src/test/resources/application-test.properties`), so no
 MySQL instance and no environment variables are needed.
 
@@ -274,7 +279,7 @@ java -jar target/taskmanagementtool-0.0.1-SNAPSHOT.jar
 | Profile | Port | Notes |
 | --- | --- | --- |
 | *(none)* | 8080 | base config in `application.yml` |
-| `dev` | 8081 | **active by default** |
+| `dev` | 8081 | **active by default**; also the only profile that sets `app.password-reset.expose-otp: true` |
 | `prod` | 8082 | |
 | `desktop` | — | `SecurityConfig` degrades to `permitAll()` for every request. Local convenience only; never enable it on a reachable host. |
 
@@ -296,6 +301,7 @@ Set in `src/main/resources/application.properties`:
 | `app.cors.allowed-origins` | `http://localhost:3000,http://localhost:5173,http://localhost:5174` | comma-separated frontend origins |
 | `app.upload.dir` | `${user.home}/taskmanager-uploads` | avatar upload target |
 | `spring.servlet.multipart.max-file-size` | `5MB` | avatar size ceiling |
+| `app.password-reset.expose-otp` | `false` (`true` under `dev`) | whether `/users/forgot-password` returns the OTP in its response body — set in `application.yml`, not `application.properties` |
 
 Caching is enabled (`@EnableCaching`) with an in-memory
 `ConcurrentMapCacheManager`; `CacheConfig` names the caches and carries a
@@ -314,8 +320,8 @@ requires `Authorization: Bearer <token>`.
 | POST | `/refresh-token` | refresh token → new access token |
 | POST | `/logout` | blacklist a token |
 | POST | `/users/register` | self-registration |
-| POST | `/users/forgot-password` | issue a reset token |
-| POST | `/users/reset-password` | consume a reset token |
+| POST | `/users/forgot-password` | issue a reset OTP — returned in the body **only under the `dev` profile**, see [Password reset](#password-reset) |
+| POST | `/users/reset-password` | consume an OTP and set a new password |
 
 Swagger UI and `/v3/api-docs/**` are also public.
 
@@ -337,6 +343,7 @@ Swagger UI and `/v3/api-docs/**` are also public.
 | POST | `/tasks/bulk-delete` | soft-delete many ids |
 | GET | `/tasks/user/{userId}` | `ROLE_ADMIN` only |
 | GET | `/tasks/export` | CSV of the caller's tasks |
+| GET | `/tasks/home` | a static greeting string; not used by the frontend |
 
 The paged endpoints (`/tasks`, `/tasks/filter`, `/tasks/search`,
 `/tasks/user/{userId}`) return a **plain JSON array**, not a Spring `Page`
@@ -382,6 +389,31 @@ Standard `?page=` and `?size=` query parameters apply, capped at 50 rows.
 | POST | `/users/me/avatar` | multipart upload |
 | POST | `/users/{id}/assign-admin` | `ROLE_ADMIN` |
 | POST | `/users/{id}/remove-admin` | `ROLE_ADMIN` |
+
+## Password Reset
+
+**The reset flow cannot be completed outside the `dev` profile.** There is no
+email delivery in this project yet, so nothing sends the user their OTP.
+
+`POST /api/users/forgot-password` generates a 6-digit OTP, stores it in
+`PasswordResetService` for 15 minutes, and returns `200` with a fixed message
+regardless of whether the address has an account. Whether the OTP itself comes
+back in the response body is controlled by `app.password-reset.expose-otp`,
+which is **`false` everywhere except the `dev` profile**. With it off, the OTP
+is generated and stored but never leaves the server, so `POST
+/api/users/reset-password` can never be given a valid token by a real user.
+
+That is deliberate rather than an oversight. Both endpoints are `permitAll`, so
+returning the OTP means anyone who can name an email address can read its OTP
+and hand it straight back to `/reset-password` — an unauthenticated takeover of
+any account whose address is known. Until a mailer exists, the flow is left
+non-functional in deployed environments rather than open to everyone.
+`UserController` logs a warning at startup whenever the echo is on, and
+`ForgotPasswordOtpExposureTest` covers both settings.
+
+**To finish this feature**, wire a mailer into `UserController.forgotPassword`
+so the OTP is sent to the address instead of returned, and leave
+`expose-otp: false`.
 
 ## Security
 
@@ -451,24 +483,28 @@ validation failures additionally carry a field-error map.
 | --- | --- | --- |
 | `ResourceNotFoundException` | 404 | `ErrorResponse` |
 | `NoTasksFoundException` | 404 | `ErrorResponse` |
+| `TaskNotFoundException` | 404 | `ErrorResponse` |
+| `UserNotFoundException` | 404 | `ErrorResponse` |
 | `TokenValidationException` | 401 | plain message |
 | Spring Security `AuthenticationException` | 401 | plain message |
+| `AuthenticationFailedException` | 401 | plain message |
+| `AuthenticationRequiredException` | 401 | plain message |
 | `MethodArgumentNotValidException` | 400 | `ErrorResponse` + field errors |
 | `ConstraintViolationException` | 400 | `ErrorResponse` + field errors |
 | `IllegalArgumentException` | 400 | `ErrorResponse` |
 | `JsonProcessingException` | 400 | `ErrorResponse` |
 | anything else | 500 | `ErrorResponse` |
 
-Note the gap: `TaskNotFoundException`, `UserNotFoundException`,
-`AuthenticationFailedException` and `AuthenticationRequiredException` all extend
-`RuntimeException` and have no dedicated handler, so they currently fall through
-to the catch-all and surface as **500**, not the 404/401 their names imply.
-Worth fixing before anyone builds client behaviour on those status codes.
+`TaskNotFoundException`, `UserNotFoundException`,
+`AuthenticationFailedException` and `AuthenticationRequiredException` used to
+have no dedicated handler and fell through to the catch-all as **500**. Each
+now maps to the status its name implies, and `ExceptionStatusCodeIntegrationTest`
+asserts all of them end to end.
 
 ## Testing
 
 JUnit 5, Mockito, Spring Boot Test and `spring-security-test`, against H2 in
-MySQL mode. `./mvnw test` — **123 tests, 14 classes**:
+MySQL mode. `./mvnw test` — **132 tests, 15 classes**:
 
 | Class | Tests | Covers |
 | --- | --- | --- |
@@ -479,6 +515,7 @@ MySQL mode. `./mvnw test` — **123 tests, 14 classes**:
 | `TaskServiceImplTest` | 10 | task service behaviour with mocked repositories |
 | `TaskQueryCountIntegrationTest` | 10 | query counts for the `@EntityGraph` and aggregate paths |
 | `GlobalExceptionHandlerTest` | 9 | exception → status mapping |
+| `ForgotPasswordOtpExposureTest` | 9 | that `/forgot-password` returns the OTP only when `app.password-reset.expose-otp` is on, and that a known and an unknown address are indistinguishable either way |
 | `UserControllerSecurityTest` | 7 | that a non-admin cannot grant itself a role through a profile update |
 | `LogSanitizerTest` | 6 | CR/LF and control-character stripping, truncation |
 | `TokenBlacklistServiceTest` | 4 | revocation on logout, expiry eviction |
@@ -487,6 +524,24 @@ MySQL mode. `./mvnw test` — **123 tests, 14 classes**:
 | `CustomUserDetailsServiceTest` | 2 | user lookup and authority mapping |
 | `TaskmanagementtoolApplicationTests` | 1 | context loads |
 
-CI runs the same command on Java 17 (`.github/workflows/ci.yml`, job
-**Backend (Java 17)**), which is a required check on `main`. Dependency updates
-arrive weekly through Dependabot (`.github/dependabot.yml`).
+### CI
+
+`.github/workflows/ci.yml`, job **Backend (Java 17)** — a required check on
+`main`. It runs `./mvnw -B test` on Temurin 17, uploads the surefire reports,
+renders the JaCoCo coverage numbers into the job summary, uploads
+`target/site/jacoco/jacoco.xml`, and runs `./mvnw sonar:sonar`
+(`continue-on-error`, so a SonarCloud outage cannot fail the required check).
+Sonar's configuration lives in `pom.xml`, not a `sonar-project.properties`,
+because `sonar-maven-plugin` does not read that file.
+
+Two other workflows sit alongside it:
+
+| Workflow | Trigger | Does |
+| --- | --- | --- |
+| `dependabot-auto-merge.yml` | `pull_request` from `dependabot[bot]` | queues auto-merge for patch/minor updates, so they land once the required check passes; majors are left for a human |
+| `slack-notify.yml` | push to any branch | posts commit metadata to a Slack webhook |
+
+Dependency updates arrive weekly through Dependabot
+(`.github/dependabot.yml`), **grouped into one PR per ecosystem** (maven and
+github-actions) covering that week's minor and patch bumps. Library majors are
+ignored; action majors are not, because GitHub retires old action runtimes.
